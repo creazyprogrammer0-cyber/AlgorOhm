@@ -1,0 +1,2807 @@
+<!DOCTYPE html>
+<html lang="en" class="dark scroll-smooth">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AlgorOhm Robotics — Neural Compute × Physical Actuation</title>
+
+  <!-- Google Fonts: Space Grotesk, Inter, JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet" />
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'system-ui', 'sans-serif'],
+            display: ['Space Grotesk', 'Inter', 'sans-serif'],
+            mono: ['JetBrains Mono', 'ui-monospace', 'SFMono-Regular', 'monospace'],
+          }
+        }
+      }
+    };
+  </script>
+
+  <!-- React 18 & ReactDOM 18 UMD CDNs -->
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+
+  <!-- Babel Standalone CDN for in-browser JSX compilation -->
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <style>
+    @keyframes scanlineSweep {
+      0% { transform: translateY(-100%); }
+      100% { transform: translateY(420%); }
+    }
+    @keyframes pulseSlow {
+      0%, 100% { opacity: 0.35; transform: scale(1); }
+      50% { opacity: 0.75; transform: scale(1.04); }
+    }
+    .animate-scanline {
+      animation: scanlineSweep 5.5s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+    }
+    .animate-pulse-slow {
+      animation: pulseSlow 6s ease-in-out infinite;
+    }
+    /* Custom Scrollbar */
+    ::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #07090E;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #1E293B;
+      border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #00E5FF;
+    }
+  </style>
+</head>
+<body class="bg-[#07090E] text-slate-100 font-sans antialiased selection:bg-cyan-400 selection:text-slate-950 overflow-x-hidden">
+  <!-- Main Application Mount Point -->
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useRef, useMemo } = React;
+
+    // --- INLINE PRECISION LUCIDE-COMPATIBLE SVG ICONS ---
+    const IconWrapper = ({ children, className = "w-4 h-4" }) => (
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        className={className}
+      >
+        {children}
+      </svg>
+    );
+
+    const Cpu = ({ className }) => (
+      <IconWrapper className={className}>
+        <rect x="4" y="4" width="16" height="16" rx="2" />
+        <rect x="9" y="9" width="6" height="6" />
+        <path d="M15 2v2M15 20v2M2 15h2M2 9h2M20 15h2M20 9h2M9 2v2M9 20v2" />
+      </IconWrapper>
+    );
+
+    const Zap = ({ className }) => (
+      <IconWrapper className={className}>
+        <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+      </IconWrapper>
+    );
+
+    const Sliders = ({ className }) => (
+      <IconWrapper className={className}>
+        <line x1="4" x2="4" y1="21" y2="14" />
+        <line x1="4" x2="4" y1="10" y2="3" />
+        <line x1="12" x2="12" y1="21" y2="12" />
+        <line x1="12" x2="12" y1="8" y2="3" />
+        <line x1="20" x2="20" y1="21" y2="16" />
+        <line x1="20" x2="20" y1="12" y2="3" />
+        <line x1="2" x2="6" y1="14" y2="14" />
+        <line x1="10" x2="14" y1="8" y2="8" />
+        <line x1="18" x2="22" y1="16" y2="16" />
+      </IconWrapper>
+    );
+
+    const ChevronRight = ({ className }) => (
+      <IconWrapper className={className}>
+        <path d="m9 18 6-6-6-6" />
+      </IconWrapper>
+    );
+
+    const Layers = ({ className }) => (
+      <IconWrapper className={className}>
+        <polygon points="12 2 2 7 12 12 22 7 12 2" />
+        <polyline points="2 17 12 22 22 17" />
+        <polyline points="2 12 12 17 22 12" />
+      </IconWrapper>
+    );
+
+    const Terminal = ({ className }) => (
+      <IconWrapper className={className}>
+        <polyline points="4 17 10 11 4 5" />
+        <line x1="12" x2="20" y1="19" y2="19" />
+      </IconWrapper>
+    );
+
+    const ArrowUpRight = ({ className }) => (
+      <IconWrapper className={className}>
+        <path d="M7 7h10v10" />
+        <path d="M7 17 17 7" />
+      </IconWrapper>
+    );
+
+    const CheckCircle2 = ({ className }) => (
+      <IconWrapper className={className}>
+        <circle cx="12" cy="12" r="10" />
+        <path d="m9 12 2 2 4-4" />
+      </IconWrapper>
+    );
+
+    const Gauge = ({ className }) => (
+      <IconWrapper className={className}>
+        <path d="m12 14 4-4" />
+        <path d="M3.34 19a10 10 0 1 1 17.32 0" />
+      </IconWrapper>
+    );
+
+    const Boxes = ({ className }) => (
+      <IconWrapper className={className}>
+        <path d="M2.97 12.92A2 2 0 0 0 2 14.63v3.24a2 2 0 0 0 .97 1.71l3 1.8a2 2 0 0 0 2.06 0L12 19v-5.5l-5-3-4.03 2.42Z" />
+        <path d="m7 16.5-4.74-2.85" />
+        <path d="m7 16.5 5-3" />
+        <path d="M7 16.5v5.17" />
+        <path d="M12 13.5V19l3.97 2.38a2 2 0 0 0 2.06 0l3-1.8a2 2 0 0 0 .97-1.71v-3.24a2 2 0 0 0-.97-1.71L17 10.5l-5 3Z" />
+        <path d="m17 16.5-5-3" />
+        <path d="m17 16.5 4.74-2.85" />
+        <path d="M17 16.5v5.17" />
+        <path d="M7.97 4.42A2 2 0 0 0 7 6.13v4.37l5 3 5-3V6.13a2 2 0 0 0-.97-1.71l-3-1.8a2 2 0 0 0-2.06 0l-3 1.8Z" />
+        <path d="M12 8 7.26 5.15" />
+        <path d="m12 8 4.74-2.85" />
+        <path d="M12 13.5V8" />
+      </IconWrapper>
+    );
+
+    const FileText = ({ className }) => (
+      <IconWrapper className={className}>
+        <path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z" />
+        <path d="M14 2v4a2 2 0 0 0 2 2h4" />
+        <path d="M10 9H8M16 13H8M16 17H8" />
+      </IconWrapper>
+    );
+
+    const X = ({ className }) => (
+      <IconWrapper className={className}>
+        <path d="M18 6 6 18" />
+        <path d="m6 6 12 12" />
+      </IconWrapper>
+    );
+
+    const Play = ({ className }) => (
+      <IconWrapper className={className}>
+        <polygon points="6 3 20 12 6 21 6 3" />
+      </IconWrapper>
+    );
+
+    const Pause = ({ className }) => (
+      <IconWrapper className={className}>
+        <rect x="14" y="4" width="4" height="16" rx="1" />
+        <rect x="6" y="4" width="4" height="16" rx="1" />
+      </IconWrapper>
+    );
+
+    const RotateCcw = ({ className }) => (
+      <IconWrapper className={className}>
+        <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+        <path d="M3 3v5h5" />
+      </IconWrapper>
+    );
+
+    const BatteryCharging = ({ className }) => (
+      <IconWrapper className={className}>
+        <path d="M15 7h1a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2h-2" />
+        <path d="M6 7H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h1" />
+        <path d="m11 7-3 5h4l-3 5" />
+        <line x1="22" x2="22" y1="11" y2="13" />
+      </IconWrapper>
+    );
+
+    const Factory = ({ className }) => (
+      <IconWrapper className={className}>
+        <path d="M2 20a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8l-7 5V8l-7 5V4a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z" />
+        <path d="M17 18h1M12 18h1M7 18h1" />
+      </IconWrapper>
+    );
+
+    const Plane = ({ className }) => (
+      <IconWrapper className={className}>
+        <path d="M17.8 19.2 16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.5 5.3c.3.4.8.5 1.3.3l.5-.2c.4-.3.6-.7.5-1.2z" />
+      </IconWrapper>
+    );
+
+    const Anchor = ({ className }) => (
+      <IconWrapper className={className}>
+        <circle cx="12" cy="5" r="3" />
+        <line x1="12" x2="12" y1="22" y2="8" />
+        <path d="M5 12H2a10 10 0 0 0 20 0h-3" />
+      </IconWrapper>
+    );
+
+    const Microchip = ({ className }) => (
+      <IconWrapper className={className}>
+        <rect x="6" y="4" width="12" height="16" rx="2" />
+        <path d="M10 8h4M10 12h4M10 16h4M2 8h4M2 12h4M2 16h4M18 8h4M18 12h4M18 16h4" />
+      </IconWrapper>
+    );
+
+    const Menu = ({ className }) => (
+      <IconWrapper className={className}>
+        <line x1="4" x2="20" y1="12" y2="12" />
+        <line x1="4" x2="20" y1="6" y2="6" />
+        <line x1="4" x2="20" y1="18" y2="18" />
+      </IconWrapper>
+    );
+
+    const Camera = ({ className }) => (
+      <IconWrapper className={className}>
+        <path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z" />
+        <circle cx="12" cy="13" r="3" />
+      </IconWrapper>
+    );
+
+    const Crosshair = ({ className }) => (
+      <IconWrapper className={className}>
+        <circle cx="12" cy="12" r="10" />
+        <line x1="22" x2="18" y1="12" y2="12" />
+        <line x1="6" x2="2" y1="12" y2="12" />
+        <line x1="12" x2="12" y1="6" y2="2" />
+        <line x1="12" x2="12" y1="22" y2="18" />
+      </IconWrapper>
+    );
+
+    const Scan = ({ className }) => (
+      <IconWrapper className={className}>
+        <path d="M3 7V5a2 2 0 0 1 2-2h2" />
+        <path d="M17 3h2a2 2 0 0 1 2 2v2" />
+        <path d="M21 17v2a2 2 0 0 1-2 2h-2" />
+        <path d="M7 21H5a2 2 0 0 1-2-2v-2" />
+        <line x1="7" x2="17" y1="12" y2="12" />
+      </IconWrapper>
+    );
+
+    const Maximize2 = ({ className }) => (
+      <IconWrapper className={className}>
+        <polyline points="15 3 21 3 21 9" />
+        <polyline points="9 21 3 21 3 15" />
+        <line x1="21" x2="14" y1="3" y2="10" />
+        <line x1="3" x2="10" y1="21" y2="14" />
+      </IconWrapper>
+    );
+
+    const Move = ({ className }) => (
+      <IconWrapper className={className}>
+        <polyline points="5 9 2 12 5 15" />
+        <polyline points="9 5 12 2 15 5" />
+        <polyline points="15 19 12 22 9 19" />
+        <polyline points="19 9 22 12 19 15" />
+        <line x1="2" x2="22" y1="12" y2="12" />
+        <line x1="12" x2="12" y1="2" y2="22" />
+      </IconWrapper>
+    );
+
+    const Download = ({ className }) => (
+      <IconWrapper className={className}>
+        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+        <polyline points="7 10 12 15 17 10" />
+        <line x1="12" x2="12" y1="15" y2="3" />
+      </IconWrapper>
+    );
+
+    // --- SMOOTH ANIMATED NUMBER HOOK ---
+    function useAnimatedNumber(targetValue, duration = 520, decimals = 0) {
+      const [displayValue, setDisplayValue] = useState(targetValue);
+      const prevValueRef = useRef(targetValue);
+
+      useEffect(() => {
+        const startValue = prevValueRef.current;
+        const endValue = Number(targetValue);
+        if (startValue === endValue) return;
+
+        let startTime = null;
+        let rafId = null;
+
+        const step = (timestamp) => {
+          if (!startTime) startTime = timestamp;
+          const progress = Math.min((timestamp - startTime) / duration, 1);
+          const eased = 1 - Math.pow(1 - progress, 4);
+          const current = startValue + (endValue - startValue) * eased;
+          setDisplayValue(Number(current.toFixed(decimals)));
+
+          if (progress < 1) {
+            rafId = requestAnimationFrame(step);
+          } else {
+            prevValueRef.current = endValue;
+            setDisplayValue(Number(endValue.toFixed(decimals)));
+          }
+        };
+
+        rafId = requestAnimationFrame(step);
+        return () => {
+          if (rafId) cancelAnimationFrame(rafId);
+        };
+      }, [targetValue, duration, decimals]);
+
+      return displayValue;
+    }
+
+    // --- SPOTLIGHT CARD WITH CURSOR-FOLLOWING RADIAL GLOW ---
+    const SpotlightCard = ({ children, className = '', onClick, glowColor = 'rgba(0, 229, 255, 0.13)' }) => {
+      const cardRef = useRef(null);
+      const [coords, setCoords] = useState({ x: -500, y: -500, opacity: 0 });
+
+      const handleMouseMove = (e) => {
+        if (!cardRef.current) return;
+        const rect = cardRef.current.getBoundingClientRect();
+        setCoords({
+          x: e.clientX - rect.left,
+          y: e.clientY - rect.top,
+          opacity: 1
+        });
+      };
+
+      const handleMouseLeave = () => {
+        setCoords((prev) => ({ ...prev, opacity: 0 }));
+      };
+
+      return (
+        <div
+          ref={cardRef}
+          onClick={onClick}
+          onMouseMove={handleMouseMove}
+          onMouseLeave={handleMouseLeave}
+          className={`relative overflow-hidden transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] ${className}`}
+        >
+          <div
+            className="pointer-events-none absolute -inset-px transition-opacity duration-500 z-0"
+            style={{
+              opacity: coords.opacity,
+              background: `radial-gradient(520px circle at ${coords.x}px ${coords.y}px, ${glowColor}, transparent 45%)`
+            }}
+          />
+          <div className="relative z-10 h-full flex flex-col justify-between">{children}</div>
+        </div>
+      );
+    };
+
+    // --- CUSTOM BRAND SVG LOGO (ALGOR NODE + OHM Ω) ---
+    const AlgorOhmLogo = ({ className = "w-9 h-9" }) => (
+      <svg viewBox="0 0 48 48" fill="none" className={className} xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <linearGradient id="algorGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="#00E5FF" />
+            <stop offset="55%" stopColor="#0EA5E9" />
+            <stop offset="100%" stopColor="#F59E0B" />
+          </linearGradient>
+          <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+            <feGaussianBlur stdDeviation="2" result="blur" />
+            <feComposite in="SourceGraphic" in2="blur" operator="over" />
+          </filter>
+        </defs>
+        <polygon
+          points="24,2 43,13 43,35 24,46 5,35 5,13"
+          stroke="rgba(255,255,255,0.14)"
+          strokeWidth="1.5"
+          fill="rgba(11,15,23,0.85)"
+        />
+        <line x1="24" y1="11" x2="15" y2="23" stroke="#00E5FF" strokeWidth="1.2" strokeOpacity="0.45" strokeDasharray="2 2" />
+        <line x1="24" y1="11" x2="33" y2="23" stroke="#00E5FF" strokeWidth="1.2" strokeOpacity="0.45" strokeDasharray="2 2" />
+        <line x1="15" y1="23" x2="33" y2="23" stroke="#F59E0B" strokeWidth="1.2" strokeOpacity="0.4" />
+        <path
+          d="M11 35 H18.5 V31.2 C14.5 29.2 12.5 25.0 12.5 20.2 C12.5 13.5 17.6 8.5 24 8.5 C30.4 8.5 35.5 13.5 35.5 20.2 C35.5 25.0 33.5 29.2 29.5 31.2 V35 H37"
+          stroke="url(#algorGrad)"
+          strokeWidth="3.2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          filter="url(#glow)"
+        />
+        <circle cx="24" cy="8.5" r="2.6" fill="#00E5FF" />
+        <circle cx="12.5" cy="20.2" r="2.2" fill="#00E5FF" />
+        <circle cx="35.5" cy="20.2" r="2.2" fill="#F59E0B" />
+        <circle cx="18.5" cy="35" r="2.3" fill="#00E5FF" />
+        <circle cx="29.5" cy="35" r="2.3" fill="#F59E0B" />
+        <circle cx="24" cy="21.5" r="3" fill="#F8FAFC" />
+      </svg>
+    );
+
+    // --- ROBOTIC PLATFORMS DATA WITH UNIQUE REAL PHOTOGRAPHY & CV TELEMETRY OVERLAYS ---
+    const ROBOT_PLATFORMS = [
+      {
+        id: 'ohm-x1',
+        name: 'Ohm-X1 Humanoid',
+        codename: 'GEN-4 ANTHROPOMORPHIC',
+        category: 'Bipedal & Humanoid',
+        tagline: 'General-purpose bipedal manipulation in unstructured industrial environments.',
+        image: 'https://images.unsplash.com/photo-1485827404703-89b55fcc595e?auto=format&fit=crop&w=1200&q=85',
+        secondaryImage: 'https://images.unsplash.com/photo-1535378917042-10a22c95931a?auto=format&fit=crop&w=900&q=80',
+        cameraMeta: 'CAM_01 // 85mm f/1.4 • ISO 160 • ZURICH BIPEDAL LAB',
+        cvBoundingBox: { x: '22%', y: '14%', w: '56%', h: '74%', label: 'CLASS: HUMANOID_X1 [CONF 99.8%]' },
+        cvKeypoints: [
+          { x: '50%', y: '24%', label: 'VLM-STEREO-ARRAY' },
+          { x: '37%', y: '48%', label: 'J3-TORSO-QDD (360Nm)' },
+          { x: '62%', y: '64%', label: 'TACTILE-EEF-0.05N' }
+        ],
+        algorRole: 'AlgorVLM-7B Spatial Foundation Model',
+        ohmRole: '38x Custom Axial-Flux QDD Actuators',
+        dof: 42,
+        peakTorque: 360,
+        computeTops: 550,
+        baseRuntimeHours: 5.4,
+        maxPayloadKg: 35,
+        nominalImpedance: '1.8 mΩ Ultra-Low Bus',
+        protectionRating: 'IP66 Sealed Joints',
+        weightKg: 62,
+        heightCm: 173,
+        priceTier: '$84,000 / Unit or $2,150/mo',
+        highlights: [
+          'Whole-body dynamic balance with 4ms reflex loop recovery',
+          '16-DOF dexterous tactile hands with 0.05N sub-millimeter force sensing',
+          'Hot-swappable 4.2 kWh solid-state structural torso battery pack'
+        ],
+        jointBreakdown: [
+          { group: 'Lower Extremity (Hip/Knee/Ankle)', actuators: '12x Ohm-QDD 360Nm', loopRate: '2.5 kHz' },
+          { group: 'Torso & Cervical Gimbal', actuators: '4x Dual-Harmonic 210Nm', loopRate: '2.0 kHz' },
+          { group: 'Upper Limbs & Dexterous Hands', actuators: '26x Micro-Coreless + Tendon', loopRate: '1.0 kHz' }
+        ]
+      },
+      {
+        id: 'vortex-amr',
+        name: 'Vortex-AMR 400',
+        codename: 'OMNI-SWARM TRANSPORTER',
+        category: 'Autonomous Mobile Robots (AMR)',
+        tagline: 'High-payload omnidirectional autonomous logistics with zero infrastructure modification.',
+        image: 'https://images.unsplash.com/photo-1581092160607-ee22621dd758?auto=format&fit=crop&w=1200&q=85',
+        secondaryImage: 'https://images.unsplash.com/photo-1581092335397-9583fe92d232?auto=format&fit=crop&w=900&q=80',
+        cameraMeta: 'CAM_04 // 35mm f/2.0 • ISO 400 • MUNICH WAFER FAB',
+        cvBoundingBox: { x: '16%', y: '22%', w: '68%', h: '62%', label: 'SWARM_NODE: VORTEX_400 [LOCKED]' },
+        cvKeypoints: [
+          { x: '28%', y: '68%', label: 'SWERVE-HUB-520Nm' },
+          { x: '52%', y: '38%', label: 'SOLID-STATE-LIDAR-360' },
+          { x: '74%', y: '56%', label: 'SIC-INVERTER-0.9mΩ' }
+        ],
+        algorRole: 'Multi-Agent Swarm Mesh + 3D LiDAR SLAM',
+        ohmRole: '4x Swerve-Drive In-Hub Regenerative Motors',
+        dof: 10,
+        peakTorque: 520,
+        computeTops: 275,
+        baseRuntimeHours: 14.0,
+        maxPayloadKg: 1200,
+        nominalImpedance: '0.9 mΩ SiC Inverter Stage',
+        protectionRating: 'IP67 Cleanroom & Foundry',
+        weightKg: 185,
+        heightCm: 32,
+        priceTier: '$38,500 / Unit or $980/mo',
+        highlights: [
+          'Zero-turn radius swerve kinematics with active suspension leveling',
+          'Inductive wireless opportunity charging at 6 kW (10 min for 3 hrs run)',
+          'Cooperative dual-unit synchronization for 2,400 kg aerospace tooling'
+        ],
+        jointBreakdown: [
+          { group: 'Swerve Traction Drive Modules', actuators: '8x Ohm-Hub 520Nm Brushless', loopRate: '4.0 kHz' },
+          { group: 'Electro-Hydraulic Lift Deck', actuators: '2x Ball-Screw Servo Columns', loopRate: '1.0 kHz' }
+        ]
+      },
+      {
+        id: 'kinetix-7',
+        name: 'Kinetix-7 Axis Arm',
+        codename: 'SUB-MICRON COBOT MANIPULATOR',
+        category: 'Precision Manipulators',
+        tagline: 'Redundant 7-DOF collaborative robotic arm with zero-backlash haptic compliance.',
+        image: 'https://images.unsplash.com/photo-1563968743333-044cef800494?auto=format&fit=crop&w=1200&q=85',
+        secondaryImage: 'https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?auto=format&fit=crop&w=900&q=80',
+        cameraMeta: 'CAM_07 // 50mm Macro • ISO 100 • TOKYO PHOTONICS CELL',
+        cvBoundingBox: { x: '20%', y: '12%', w: '60%', h: '76%', label: 'KINEMATICS: 7-DOF ±0.015mm' },
+        cvKeypoints: [
+          { x: '45%', y: '28%', label: 'J4-ELBOW-HARMONIC' },
+          { x: '58%', y: '52%', label: 'OPTICAL-TORQUE-RING' },
+          { x: '34%', y: '74%', label: 'BASE-ETHERCAT-10G' }
+        ],
+        algorRole: 'Neural Inverse Kinematics + Collision-Free Trajectory',
+        ohmRole: 'Integrated Strain-Wave + Optical Torque Rings',
+        dof: 7,
+        peakTorque: 240,
+        computeTops: 200,
+        baseRuntimeHours: 24.0,
+        maxPayloadKg: 18,
+        nominalImpedance: '1.2 mΩ Direct-DC Rail',
+        protectionRating: 'ISO Class 3 Cleanroom / IP65',
+        weightKg: 24,
+        heightCm: 130,
+        priceTier: '$29,900 / Unit or $790/mo',
+        highlights: [
+          '±0.015 mm repeatability for semiconductor wafer & optical assembly',
+          'Gravity-compensated hand-guiding teaching in under 45 seconds',
+          'Integrated 48V 10Gbps EtherCAT + CoaXPress tool flange pass-through'
+        ],
+        jointBreakdown: [
+          { group: 'Shoulder & Elbow (J1-J4)', actuators: '4x Ohm-Harmonic 240Nm', loopRate: '4.0 kHz' },
+          { group: 'Spherical Wrist (J5-J7)', actuators: '3x Zero-Cogging 85Nm', loopRate: '4.0 kHz' }
+        ]
+      },
+      {
+        id: 'strider-q8',
+        name: 'Strider-Q8 Quadruped',
+        codename: 'ALL-TERRAIN RECON & INSPECTION',
+        category: 'All-Terrain Quadrupeds',
+        tagline: 'Extreme-environment autonomous quadruped with dorsal manipulator & thermal vision.',
+        image: 'https://images.unsplash.com/photo-1527430253228-e93688616381?auto=format&fit=crop&w=1200&q=85',
+        secondaryImage: 'https://images.unsplash.com/photo-1508614589041-895b88991e3e?auto=format&fit=crop&w=900&q=80',
+        cameraMeta: 'CAM_11 // 24mm f/2.8 • ISO 800 • NORTH SEA HV SUBSTATION',
+        cvBoundingBox: { x: '18%', y: '18%', w: '64%', h: '68%', label: 'TERRAIN_RL: STRIDER_Q8 [ATEX]' },
+        cvKeypoints: [
+          { x: '32%', y: '44%', label: 'LWIR-THERMAL-TURRET' },
+          { x: '56%', y: '62%', label: 'TI-PLANETARY-410Nm' },
+          { x: '68%', y: '36%', label: 'ACOUSTIC-ARRAY-64CH' }
+        ],
+        algorRole: 'Proprioceptive Terrain RL + Acoustic Anomaly AI',
+        ohmRole: '12x High-Impact Titanium Planetary Actuators',
+        dof: 18,
+        peakTorque: 410,
+        computeTops: 420,
+        baseRuntimeHours: 6.8,
+        maxPayloadKg: 45,
+        nominalImpedance: '1.5 mΩ Potted Thermal Core',
+        protectionRating: 'IP68 Submersible (2m) / ATEX Zone 2',
+        weightKg: 48,
+        heightCm: 78,
+        priceTier: '$56,000 / Unit or $1,420/mo',
+        highlights: [
+          'Climbs 45° industrial grating stairs and traverses rubble at 4.2 m/s',
+          'Optional 6-DOF dorsal arm for valve turning and breaker actuation',
+          'LWIR radiometric thermal + ultrasonic gas leak array standard'
+        ],
+        jointBreakdown: [
+          { group: 'Quadruped Abduction/Hip/Knee', actuators: '12x Ohm-Ti Planetary 410Nm', loopRate: '3.0 kHz' },
+          { group: 'Dorsal Inspection Turret & Arm', actuators: '6x Sealed Weatherproof Servo', loopRate: '1.5 kHz' }
+        ]
+      }
+    ];
+
+    // --- REAL PHOTOGRAPHY FIELD DEPLOYMENT & R&D LAB GALLERY ---
+    const FIELD_GALLERY = [
+      {
+        id: 'fg-1',
+        title: 'Dual Kinetix-7 Wafer Handling Cell',
+        location: 'Dresden 300mm Semiconductor Fab',
+        tag: 'ISO CLASS 3 CLEANROOM',
+        camera: 'SONY FX6 • 35mm T1.5 • 1/500s',
+        telemetry: 'REPEATABILITY: ±0.011mm | VIBRATION < 0.02G',
+        image: 'https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?auto=format&fit=crop&w=1200&q=85',
+        accent: 'cyan'
+      },
+      {
+        id: 'fg-2',
+        title: 'Ohm Axial-Flux Stator & SiC Inverter Testbed',
+        location: 'Zurich Electromechanical Lab',
+        tag: '0.9 mΩ BUS VALIDATION',
+        camera: 'LEICA SL2 • 90mm Macro • ISO 100',
+        telemetry: 'PEAK IMPULSE: 362.4 Nm | EFFICIENCY: 98.7%',
+        image: 'https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=1200&q=85',
+        accent: 'amber'
+      },
+      {
+        id: 'fg-3',
+        title: 'Autonomous Multi-Arm Body-in-White Cell',
+        location: 'Stuttgart EV Chassis Plant',
+        tag: 'SWARM MESH SYNC @ 250Hz',
+        camera: 'RED V-RAPTOR • 24mm • 120 FPS',
+        telemetry: 'COLLISION-FREE SPLINES | ZERO CLOUD LATENCY',
+        image: 'https://images.unsplash.com/photo-1565514020179-026b92b84bb6?auto=format&fit=crop&w=1200&q=85',
+        accent: 'cyan'
+      },
+      {
+        id: 'fg-4',
+        title: 'AlgorOS Neural Tensor Compute Blade',
+        location: 'Boston Embodied AI Center',
+        tag: '550 TOPS INT4 EDGE',
+        camera: 'PHASE ONE IQ4 • 120mm Macro',
+        telemetry: 'PHOTON-TO-TORQUE: 3.8ms | RTOS JITTER: 9µs',
+        image: 'https://images.unsplash.com/photo-1555664424-778a1e5e1b48?auto=format&fit=crop&w=1200&q=85',
+        accent: 'amber'
+      }
+    ];
+
+    // --- ARCHITECTURE STACK DATA ---
+    const ARCHITECTURE_STACK = {
+      algor: {
+        badge: 'SOFTWARE & NEURAL COMPUTE',
+        title: 'Algor™ Neural Operating System (AlgorOS 4.2)',
+        color: 'cyan',
+        heroPhoto: 'https://images.unsplash.com/photo-1555664424-778a1e5e1b48?auto=format&fit=crop&w=1000&q=85',
+        photoCaption: 'FIG 1.1 // Dual-SoC Algor Neural Tensor Module with optical PCIe Gen5 interconnect (550 TOPS).',
+        subtitle: 'Deterministic hard-real-time microkernel fused with multi-modal spatial foundation models running 100% at the edge.',
+        metrics: [
+          { label: 'Control Loop Jitter', value: '< 12 µs', detail: 'Hard RTOS Preempt-Kernel' },
+          { label: 'Visual-Motor Latency', value: '3.8 ms', detail: 'Photon-to-Actuator Torque' },
+          { label: 'Swarm Mesh Sync', value: '250 Hz', detail: 'Decentralized UWB + Wi-Fi 7' },
+          { label: 'Sim-to-Real Transfer', value: '99.2%', detail: 'Zero-Shot Physics Domain' }
+        ],
+        modules: [
+          {
+            code: 'ALG-01',
+            name: '4D Voxel Occupancy & Semantic SLAM',
+            desc: 'Fuses solid-state LiDAR, global-shutter stereo cameras, and IMU data into a dynamic 4D semantic octree capable of tracking moving humans and forklifts at 120 FPS without prior floorplan mapping.',
+            specs: ['Sub-2mm Localization Accuracy', 'Dynamic Obstacle Velocity Vectors', 'GPS-Denied Subterranean Ready']
+          },
+          {
+            code: 'ALG-02',
+            name: 'Whole-Body Model Predictive Control (WB-MPC)',
+            desc: 'Solves nonlinear contact-implicit trajectory optimization across up to 42 degrees of freedom in real time, seamlessly coordinating locomotion and bimanual force manipulation.',
+            specs: ['2.5 kHz Torque Solver', 'Slip & Push-Recovery Reflexes', 'Compliant Impedance Shaping']
+          },
+          {
+            code: 'ALG-03',
+            name: 'Edge Vision-Language-Action (AlgorVLA)',
+            desc: 'Quantized 7-billion-parameter multimodal transformer compiled to dual onboard neural accelerators. Understands natural-language engineering work orders and adapts to novel part geometries.',
+            specs: ['INT4/FP8 Tensor Core Execution', 'Zero Cloud Dependency', 'Automated Failure Recovery']
+          },
+          {
+            code: 'ALG-04',
+            name: 'Fleet Swarm Equilibrium Broker',
+            desc: 'Peer-to-peer consensus protocol that distributes tasks across heterogeneous AlgorOhm units based on battery state-of-health, actuator thermal margin, and spatial proximity.',
+            specs: ['Byzantine Fault Tolerant', 'Auto-Docking Queue Scheduling', 'ERP / MES OPC-UA Native Bridge']
+          }
+        ]
+      },
+      ohm: {
+        badge: 'ACTUATORS & POWER ELECTRONICS',
+        title: 'Ohm™ Precision Electromechanical Core',
+        color: 'amber',
+        heroPhoto: 'https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=1000&q=85',
+        photoCaption: 'FIG 2.1 // Silicon-Carbide (SiC) 96V Inverter Stage & Halbach Array Stator Windings (0.9 mΩ Bus).',
+        subtitle: 'Ultra-low-impedance Silicon-Carbide power stages paired with proprietary axial-flux quasi-direct-drive (QDD) actuators.',
+        metrics: [
+          { label: 'Peak Torque Density', value: '148 Nm/kg', detail: 'Halbach Axial-Flux Stator' },
+          { label: 'Power Stage Efficiency', value: '98.7%', detail: 'GaN / SiC 100kHz FETs' },
+          { label: 'Backdrive Transparency', value: '0.18 Nm', detail: 'Sensorless Force Fidelity' },
+          { label: 'Energy Regeneration', value: '34.5%', detail: 'Deceleration Kinetic Capture' }
+        ],
+        modules: [
+          {
+            code: 'OHM-01',
+            name: 'Quasi-Direct Drive (QDD) Halbach Actuators',
+            desc: 'Custom frameless outrunner motors with coreless segmented windings and single-stage 9:1 titanium cycloidal gearing. Eliminates fragile load cells by estimating external contact forces directly from phase current.',
+            specs: ['Zero Backlash (< 0.5 arcmin)', 'Peak 360 Nm Impulse Rating', 'Internal Liquid/Phase-Change Cooling']
+          },
+          {
+            code: 'OHM-02',
+            name: 'Ultra-Low Impedance SiC Bus Architecture',
+            desc: 'Distributed 96V DC laminated copper-graphene busbars with sub-milliohm parasitic resistance. Delivers instantaneous 180A current spikes for dynamic jumps or heavy lifting without voltage sag.',
+            specs: ['0.9 mΩ Bus Impedance', '10 Mbps Isolated CAN-FD + EtherCAT', 'EMI/EMC MIL-STD-461G Compliant']
+          },
+          {
+            code: 'OHM-03',
+            name: 'Structural Solid-State Anode-Free Battery Packs',
+            desc: 'Load-bearing carbon-composite battery modules integrated directly into the robot pelvis or chassis. Nail-penetration safe with rapid 4C inductive charging support.',
+            specs: ['390 Wh/kg Gravimetric Density', '3,500+ Cycle Life to 85% SoH', 'Hot-Swappable Dual-Rail Redundancy']
+          },
+          {
+            code: 'OHM-04',
+            name: '6-Axis Optical Force-Torque & Haptic Skin',
+            desc: 'Capacitive-optical elastomer fingertips and wrist rings capable of resolving both shear slip and normal forces from 0.05 Newtons up to 500 Newtons without magnetic interference.',
+            specs: ['10 kHz Sampling Bandwidth', 'Thermal Conductivity Sensing', 'IP68 Hermetic Laser Weld']
+          }
+        ]
+      }
+    };
+
+    // --- WHITEPAPERS & MILESTONES ---
+    const WHITEPAPERS = [
+      {
+        id: 'wp-1',
+        code: 'TR-2026-04',
+        title: 'Sub-Milliohm Power Distribution & Regenerative Braking in Bipedal Locomotion',
+        authors: 'Dr. K. Vance, H. Takahashi, AlgorOhm Power Systems Lab',
+        pages: '28 Pages • PDF',
+        date: 'Oct 2026',
+        category: 'Ohm Hardware',
+        abstract: 'Demonstrating a 34.5% net runtime extension on the Ohm-X1 Humanoid through bidirectional GaN field-oriented control during negative-work gait phases and stair descent.'
+      },
+      {
+        id: 'wp-2',
+        code: 'TR-2026-02',
+        title: 'Contact-Implicit Model Predictive Control at 2.5 kHz Without Dedicated Force Sensors',
+        authors: 'S. Lindqvist, Dr. A. Rostova, Algor Neural Compute Group',
+        pages: '34 Pages • PDF',
+        date: 'Aug 2026',
+        category: 'AlgorOS AI',
+        abstract: 'How ultra-low-friction QDD actuators paired with motor phase-current observers enable compliant whole-body manipulation in cluttered assembly cells.'
+      },
+      {
+        id: 'wp-3',
+        code: 'TR-2025-11',
+        title: 'Zero-Shot Sim-to-Real Transfer for Heterogeneous AMR + Humanoid Factory Swarms',
+        authors: 'M. Chen, E. Kowalski, AlgorOhm Systems Architecture',
+        pages: '22 Pages • PDF',
+        date: 'Dec 2025',
+        category: 'Swarm Telemetry',
+        abstract: 'Benchmarking 120-unit mixed fleets across semiconductor fab and automotive body-in-white environments with 99.984% mean-time-between-interventions.'
+      }
+    ];
+
+    function App() {
+      // Navigation & Modal State
+      const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+      const [demoModalOpen, setDemoModalOpen] = useState(false);
+      const [selectedWhitepaper, setSelectedWhitepaper] = useState(null);
+      const [lightboxPhoto, setLightboxPhoto] = useState(null);
+
+      // Computer Vision HUD Overlay Toggle for Real Photos
+      const [cvHudEnabled, setCvHudEnabled] = useState(true);
+
+      // Hero Interactive Kinematic & Sensor Canvas State
+      const [simMode, setSimMode] = useState('kinematic'); // 'kinematic' | 'lidar' | 'neural'
+      const [simRunning, setSimRunning] = useState(true);
+      const [autoTrajectory, setAutoTrajectory] = useState(false);
+      const [targetX, setTargetX] = useState(68);
+      const [targetY, setTargetY] = useState(38);
+      const [loadMassKg, setLoadMassKg] = useState(14.5);
+      const canvasRef = useRef(null);
+
+      // Spring-Physics State Ref for 60fps+ Buttery Smooth Arm Motion
+      const physicsRef = useRef({
+        currentX: 68,
+        currentY: 38,
+        vx: 0,
+        vy: 0,
+        trail: []
+      });
+
+      // Live Telemetry Readouts derived from Hero state
+      const [liveTelemetry, setLiveTelemetry] = useState({
+        j1Angle: 42.4,
+        j2Angle: -68.1,
+        j3Angle: 29.5,
+        shoulderTorque: 118.4,
+        elbowTorque: 74.2,
+        busCurrent: 19.8,
+        busImpedance: 1.42,
+        loopLatency: 1.84
+      });
+
+      // Flagship Platforms State
+      const [platformCategory, setPlatformCategory] = useState('All');
+      const [inspectedRobot, setInspectedRobot] = useState(ROBOT_PLATFORMS[0]);
+      const [inspectorPayloadSim, setInspectorPayloadSim] = useState(15);
+      const [inspectorDutyCycle, setInspectorDutyCycle] = useState(75);
+
+      // Dual-Core Architecture Tab State
+      const [activeStackTab, setActiveStackTab] = useState('algor');
+
+      // Fleet ROI Configurator State
+      const [roiIndustry, setRoiIndustry] = useState('semiconductor');
+      const [roiUnits, setRoiUnits] = useState(8);
+      const [roiShifts, setRoiShifts] = useState(3);
+      const [roiFacilitySqFt, setRoiFacilitySqFt] = useState(120000);
+
+      // Pilot Consultation Modal Form State
+      const [pilotForm, setPilotForm] = useState({
+        fullName: '',
+        workEmail: '',
+        company: '',
+        platformInterest: 'Ohm-X1 Humanoid',
+        deploymentScale: '5 - 15 Units (Pilot Cell)',
+        environmentNotes: ''
+      });
+      const [pilotFormError, setPilotFormError] = useState('');
+      const [pilotSubmitted, setPilotSubmitted] = useState(false);
+
+      // Reset inspector slider when switching robot
+      useEffect(() => {
+        setInspectorPayloadSim(Math.round(inspectedRobot.maxPayloadKg * 0.45));
+      }, [inspectedRobot]);
+
+      // One-Click Download Standalone HTML Handler
+      const handleDownloadStandaloneHtml = () => {
+        const htmlContent = '<!DOCTYPE html>\n' + document.documentElement.outerHTML;
+        const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'AlgorOhm-Robotics-Platform.html';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      };
+
+      // Graceful Image Fallback Handler
+      const handleImageError = (e, fallbackLabel = 'ALGOROHM OPTICAL FEED') => {
+        e.currentTarget.onerror = null;
+        e.currentTarget.src = `https://placehold.co/1200x800/0B0F17/00E5FF?text=${encodeURIComponent(fallbackLabel)}`;
+      };
+
+      // --- HERO 2D SPRING-PHYSICS KINEMATIC & TELEMETRY CANVAS ANIMATION ---
+      useEffect(() => {
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+        const ctx = canvas.getContext('2d');
+        let animationFrameId;
+        let tick = 0;
+
+        const updateSize = () => {
+          const parent = canvas.parentElement;
+          if (!parent) return;
+          const dpr = window.devicePixelRatio || 1;
+          const rect = parent.getBoundingClientRect();
+          canvas.width = rect.width * dpr;
+          canvas.height = rect.height * dpr;
+          ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        };
+
+        updateSize();
+        window.addEventListener('resize', updateSize);
+
+        const lidarPoints = Array.from({ length: 120 }, (_, i) => ({
+          angle: (i / 120) * Math.PI * 2,
+          baseDist: 70 + (i % 8) * 17,
+          zLayer: i % 3
+        }));
+
+        // Rounded Rect Helper for cross-browser compatibility
+        const drawRoundedRect = (x, y, w, h, r) => {
+          ctx.beginPath();
+          if (ctx.roundRect) {
+            ctx.roundRect(x, y, w, h, r);
+          } else {
+            ctx.rect(x, y, w, h);
+          }
+        };
+
+        const render = () => {
+          if (simRunning) {
+            tick += 0.022;
+          }
+
+          const width = canvas.width / (window.devicePixelRatio || 1);
+          const height = canvas.height / (window.devicePixelRatio || 1);
+
+          ctx.clearRect(0, 0, width, height);
+
+          // 1. Subtle Precision Engineering Grid
+          ctx.strokeStyle = 'rgba(148, 163, 184, 0.065)';
+          ctx.lineWidth = 1;
+          const gridSize = 28;
+          for (let x = 0; x < width; x += gridSize) {
+            ctx.beginPath();
+            ctx.moveTo(x, 0);
+            ctx.lineTo(x, height);
+            ctx.stroke();
+          }
+          for (let y = 0; y < height; y += gridSize) {
+            ctx.beginPath();
+            ctx.moveTo(0, y);
+            ctx.lineTo(width, y);
+            ctx.stroke();
+          }
+
+          const baseX = width * 0.23;
+          const baseY = height * 0.79;
+
+          let cmdPercentX = targetX;
+          let cmdPercentY = targetY;
+
+          if (autoTrajectory && simRunning) {
+            cmdPercentX = 64 + Math.sin(tick * 1.35) * 17;
+            cmdPercentY = 42 + Math.sin(tick * 2.7) * 16;
+          }
+
+          // --- SPRING-DAMPED INTERPOLATION FOR ULTRA-SMOOTH INERTIA ---
+          const phys = physicsRef.current;
+          const stiffness = 0.085;
+          const damping = 0.78;
+
+          const forceX = (cmdPercentX - phys.currentX) * stiffness;
+          const forceY = (cmdPercentY - phys.currentY) * stiffness;
+
+          phys.vx = (phys.vx + forceX) * damping;
+          phys.vy = (phys.vy + forceY) * damping;
+
+          phys.currentX += phys.vx;
+          phys.currentY += phys.vy;
+
+          const breathX = simRunning ? Math.sin(tick * 1.6) * 3.5 : 0;
+          const breathY = simRunning ? Math.cos(tick * 1.25) * 2.8 : 0;
+
+          const goalX = (phys.currentX / 100) * width + breathX;
+          const goalY = (phys.currentY / 100) * height + breathY;
+
+          const cmdScreenX = (cmdPercentX / 100) * width;
+          const cmdScreenY = (cmdPercentY / 100) * height;
+
+          // 2-Link + Wrist Analytical Inverse Kinematics
+          const L1 = Math.min(width, height) * 0.31;
+          const L2 = Math.min(width, height) * 0.26;
+          const L3 = Math.min(width, height) * 0.11;
+
+          const wristTargetX = goalX - L3 * 0.85;
+          const wristTargetY = goalY;
+
+          const dx = wristTargetX - baseX;
+          const dy = wristTargetY - baseY;
+          const dist = Math.min(Math.sqrt(dx * dx + dy * dy), L1 + L2 - 4);
+
+          const cosAngle2 = Math.max(-1, Math.min(1, (dist * dist - L1 * L1 - L2 * L2) / (2 * L1 * L2)));
+          const theta2 = -Math.acos(cosAngle2);
+          const k1 = L1 + L2 * Math.cos(theta2);
+          const k2 = L2 * Math.sin(theta2);
+          const theta1 = Math.atan2(dy, dx) - Math.atan2(k2, k1);
+
+          const elbowX = baseX + L1 * Math.cos(theta1);
+          const elbowY = baseY + L1 * Math.sin(theta1);
+
+          const wristX = elbowX + L2 * Math.cos(theta1 + theta2);
+          const wristY = elbowY + L2 * Math.sin(theta1 + theta2);
+
+          const eeX = wristX + L3;
+          const eeY = wristY;
+
+          if (simRunning) {
+            phys.trail.push({ x: eeX + 10, y: eeY });
+            if (phys.trail.length > 36) phys.trail.shift();
+          }
+
+          const velocityMag = Math.sqrt(phys.vx * phys.vx + phys.vy * phys.vy);
+          const reachFactor = Math.abs(eeX - baseX) / (L1 + L2 + L3);
+          const shoulderTorque = +(
+            38 +
+            loadMassKg * 6.8 * reachFactor +
+            velocityMag * 18 +
+            Math.abs(Math.sin(tick)) * 2.4
+          ).toFixed(1);
+          const elbowTorque = +(
+            19 +
+            loadMassKg * 4.1 * reachFactor +
+            velocityMag * 11 +
+            Math.abs(Math.cos(tick)) * 1.8
+          ).toFixed(1);
+          const busCurrent = +((shoulderTorque + elbowTorque) * 0.14).toFixed(1);
+          const busImpedance = +(1.15 + (loadMassKg / 35) * 0.65).toFixed(2);
+
+          if (Math.floor(tick * 25) % 4 === 0) {
+            setLiveTelemetry({
+              j1Angle: +((theta1 * 180) / Math.PI).toFixed(1),
+              j2Angle: +((theta2 * 180) / Math.PI).toFixed(1),
+              j3Angle: +((-(theta1 + theta2) * 180) / Math.PI).toFixed(1),
+              shoulderTorque,
+              elbowTorque,
+              busCurrent,
+              busImpedance,
+              loopLatency: +(1.58 + Math.sin(tick) * 0.14).toFixed(2)
+            });
+          }
+
+          // --- DRAW END-EFFECTOR VELOCITY RIBBON TRAIL ---
+          if (phys.trail.length > 2) {
+            ctx.beginPath();
+            for (let i = 0; i < phys.trail.length; i++) {
+              const pt = phys.trail[i];
+              if (i === 0) ctx.moveTo(pt.x, pt.y);
+              else ctx.lineTo(pt.x, pt.y);
+            }
+            ctx.strokeStyle = 'rgba(0, 229, 255, 0.28)';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+          }
+
+          // --- MODE SPECIFIC OVERLAYS ---
+          if (simMode === 'lidar') {
+            const scanAngle = (tick * 1.7) % (Math.PI * 2);
+            const grad = ctx.createRadialGradient(eeX, eeY, 4, eeX, eeY, 180);
+            grad.addColorStop(0, 'rgba(0, 229, 255, 0.28)');
+            grad.addColorStop(1, 'rgba(0, 229, 255, 0.0)');
+            ctx.fillStyle = grad;
+            ctx.beginPath();
+            ctx.moveTo(eeX, eeY);
+            ctx.arc(eeX, eeY, 180, scanAngle - 0.55, scanAngle + 0.55);
+            ctx.closePath();
+            ctx.fill();
+
+            lidarPoints.forEach((pt, idx) => {
+              const r = pt.baseDist + Math.sin(tick * 2 + idx) * 7;
+              const px = eeX + Math.cos(pt.angle) * r;
+              const py = eeY + Math.sin(pt.angle) * r * 0.68;
+              if (px > 12 && px < width - 12 && py > 12 && py < height - 12) {
+                const angleDiff = Math.abs(((pt.angle - scanAngle + Math.PI * 3) % (Math.PI * 2)) - Math.PI);
+                const active = angleDiff < 0.7;
+                ctx.fillStyle = active
+                  ? '#00E5FF'
+                  : pt.zLayer === 0
+                  ? 'rgba(14, 165, 233, 0.45)'
+                  : 'rgba(245, 158, 11, 0.35)';
+                ctx.beginPath();
+                ctx.arc(px, py, active ? 2.7 : 1.6, 0, Math.PI * 2);
+                ctx.fill();
+              }
+            });
+          }
+
+          if (simMode === 'neural') {
+            for (let i = -2; i <= 2; i++) {
+              const isOptimal = i === 0;
+              ctx.beginPath();
+              ctx.moveTo(baseX, baseY - 30);
+              ctx.bezierCurveTo(
+                baseX + 70,
+                baseY - 140 + i * 28,
+                eeX - 90,
+                eeY + i * 32,
+                eeX,
+                eeY
+              );
+              ctx.strokeStyle = isOptimal ? '#00E5FF' : 'rgba(0, 229, 255, 0.18)';
+              ctx.lineWidth = isOptimal ? 2.4 : 1;
+              ctx.setLineDash(isOptimal ? [] : [4, 4]);
+              ctx.stroke();
+              ctx.setLineDash([]);
+            }
+          }
+
+          // --- DRAW COMMANDED SETPOINT GHOST RETICLE ---
+          ctx.beginPath();
+          ctx.arc(cmdScreenX + 10, cmdScreenY, 8, 0, Math.PI * 2);
+          ctx.strokeStyle = 'rgba(245, 158, 11, 0.45)';
+          ctx.lineWidth = 1.2;
+          ctx.stroke();
+
+          // --- DRAW ROBOTIC CHASSIS PEDESTAL ---
+          ctx.fillStyle = '#1E293B';
+          ctx.strokeStyle = '#475569';
+          ctx.lineWidth = 2;
+          drawRoundedRect(baseX - 38, baseY, 76, 26, 6);
+          ctx.fill();
+          ctx.stroke();
+
+          ctx.strokeStyle = 'rgba(0, 229, 255, 0.3)';
+          ctx.lineWidth = 1.5;
+          ctx.beginPath();
+          ctx.moveTo(20, baseY + 26);
+          ctx.lineTo(width - 20, baseY + 26);
+          ctx.stroke();
+
+          // --- DRAW KINEMATIC LINKS (OHM CARBON-ALUMINUM) ---
+          const drawLink = (x1, y1, x2, y2, thickness, colorStroke) => {
+            ctx.save();
+            ctx.strokeStyle = '#0F172A';
+            ctx.lineWidth = thickness + 6;
+            ctx.lineCap = 'round';
+            ctx.beginPath();
+            ctx.moveTo(x1, y1);
+            ctx.lineTo(x2, y2);
+            ctx.stroke();
+
+            ctx.strokeStyle = colorStroke;
+            ctx.lineWidth = thickness;
+            ctx.lineCap = 'round';
+            ctx.beginPath();
+            ctx.moveTo(x1, y1);
+            ctx.lineTo(x2, y2);
+            ctx.stroke();
+
+            ctx.strokeStyle = 'rgba(0, 229, 255, 0.7)';
+            ctx.lineWidth = 1.6;
+            ctx.setLineDash([6, 4]);
+            ctx.lineDashOffset = -tick * 16;
+            ctx.beginPath();
+            ctx.moveTo(x1, y1);
+            ctx.lineTo(x2, y2);
+            ctx.stroke();
+            ctx.restore();
+          };
+
+          drawLink(baseX, baseY, elbowX, elbowY, 14, '#334155');
+          drawLink(elbowX, elbowY, wristX, wristY, 11, '#475569');
+          drawLink(wristX, wristY, eeX, eeY, 7, '#64748B');
+
+          // --- DRAW QDD ACTUATOR JOINTS WITH TORQUE HEAT RING ---
+          const drawActuatorNode = (x, y, radius, torqueRatio, label) => {
+            ctx.beginPath();
+            ctx.arc(x, y, radius + 6, 0, Math.PI * 2);
+            ctx.strokeStyle = torqueRatio > 0.65 ? 'rgba(245, 158, 11, 0.45)' : 'rgba(0, 229, 255, 0.35)';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            ctx.beginPath();
+            ctx.arc(x, y, radius + 6, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * Math.min(torqueRatio, 1));
+            ctx.strokeStyle = '#F59E0B';
+            ctx.lineWidth = 3.5;
+            ctx.stroke();
+
+            ctx.beginPath();
+            ctx.arc(x, y, radius, 0, Math.PI * 2);
+            ctx.fillStyle = '#0B0F17';
+            ctx.fill();
+            ctx.lineWidth = 2.5;
+            ctx.strokeStyle = '#E2E8F0';
+            ctx.stroke();
+
+            ctx.beginPath();
+            ctx.arc(x, y, 4, 0, Math.PI * 2);
+            ctx.fillStyle = '#F59E0B';
+            ctx.fill();
+
+            ctx.font = '600 10px "JetBrains Mono", ui-monospace, monospace';
+            ctx.fillStyle = '#94A3B8';
+            ctx.fillText(label, x - 18, y - radius - 11);
+          };
+
+          drawActuatorNode(baseX, baseY, 14, shoulderTorque / 320, `J1:${shoulderTorque}Nm`);
+          drawActuatorNode(elbowX, elbowY, 12, elbowTorque / 240, `J2:${elbowTorque}Nm`);
+          drawActuatorNode(wristX, wristY, 9, (loadMassKg / 35) * 0.85, 'J3:WRIST');
+
+          // --- DRAW END-EFFECTOR GRIPPER & PAYLOAD VECTOR ---
+          ctx.strokeStyle = '#00E5FF';
+          ctx.lineWidth = 2.5;
+          ctx.beginPath();
+          ctx.moveTo(eeX, eeY - 10);
+          ctx.lineTo(eeX + 12, eeY - 10);
+          ctx.moveTo(eeX, eeY + 10);
+          ctx.lineTo(eeX + 12, eeY + 10);
+          ctx.stroke();
+
+          ctx.beginPath();
+          ctx.arc(eeX + 10, eeY, 16, 0, Math.PI * 2);
+          ctx.strokeStyle = 'rgba(0, 229, 255, 0.55)';
+          ctx.lineWidth = 1.2;
+          ctx.setLineDash([3, 3]);
+          ctx.stroke();
+          ctx.setLineDash([]);
+
+          const vectorLen = 18 + (loadMassKg / 35) * 42;
+          ctx.strokeStyle = '#F59E0B';
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.moveTo(eeX + 10, eeY);
+          ctx.lineTo(eeX + 10, eeY + vectorLen);
+          ctx.lineTo(eeX + 6, eeY + vectorLen - 6);
+          ctx.moveTo(eeX + 10, eeY + vectorLen);
+          ctx.lineTo(eeX + 14, eeY + vectorLen - 6);
+          ctx.stroke();
+
+          ctx.font = '700 11px "JetBrains Mono", ui-monospace, monospace';
+          ctx.fillStyle = '#F59E0B';
+          ctx.fillText(`${loadMassKg.toFixed(1)}kg LOAD`, eeX + 20, eeY + vectorLen - 2);
+
+          animationFrameId = requestAnimationFrame(render);
+        };
+
+        render();
+
+        return () => {
+          cancelAnimationFrame(animationFrameId);
+          window.removeEventListener('resize', updateSize);
+        };
+      }, [simMode, simRunning, autoTrajectory, targetX, targetY, loadMassKg]);
+
+      // Handle interactive click/drag on Hero Canvas
+      const handleCanvasInteraction = (e) => {
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+        setAutoTrajectory(false);
+        const rect = canvas.getBoundingClientRect();
+        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+        const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+        const relX = Math.max(32, Math.min(88, Math.round(((clientX - rect.left) / rect.width) * 100)));
+        const relY = Math.max(16, Math.min(74, Math.round(((clientY - rect.top) / rect.height) * 100)));
+        setTargetX(relX);
+        setTargetY(relY);
+      };
+
+      const filteredPlatforms = useMemo(() => {
+        if (platformCategory === 'All') return ROBOT_PLATFORMS;
+        return ROBOT_PLATFORMS.filter((r) => r.category === platformCategory);
+      }, [platformCategory]);
+
+      const calculatedInspectorMetrics = useMemo(() => {
+        const loadRatio = inspectorPayloadSim / inspectedRobot.maxPayloadKg;
+        const dutyRatio = inspectorDutyCycle / 100;
+        const powerDrawWatts = Math.round(180 + loadRatio * 440 * dutyRatio);
+        const estRuntimeHours = +(
+          inspectedRobot.baseRuntimeHours *
+          (1 - loadRatio * 0.34) *
+          (1.15 - dutyRatio * 0.35)
+        ).toFixed(1);
+        const thermalMarginC = Math.round(78 - loadRatio * 22 * dutyRatio);
+        return {
+          powerDrawWatts,
+          estRuntimeHours: Math.max(1.8, estRuntimeHours),
+          thermalMarginC
+        };
+      }, [inspectedRobot, inspectorPayloadSim, inspectorDutyCycle]);
+
+      const roiResults = useMemo(() => {
+        const industryMultipliers = {
+          semiconductor: { hourlyLaborValue: 68, throughputGain: 38, defectReduction: 94, unitCapex: 58000 },
+          aerospace: { hourlyLaborValue: 74, throughputGain: 31, defectReduction: 89, unitCapex: 64000 },
+          logistics: { hourlyLaborValue: 42, throughputGain: 52, defectReduction: 78, unitCapex: 41000 },
+          energy: { hourlyLaborValue: 86, throughputGain: 44, defectReduction: 96, unitCapex: 62000 }
+        };
+        const preset = industryMultipliers[roiIndustry] || industryMultipliers.semiconductor;
+        const annualOperatingHours = roiShifts * 8 * 310;
+        const grossAnnualSavings = Math.round(
+          roiUnits * annualOperatingHours * (preset.hourlyLaborValue * 0.72) +
+            (roiFacilitySqFt / 10000) * 14500
+        );
+        const totalDeploymentCost = roiUnits * preset.unitCapex;
+        const paybackMonths = Math.max(4.2, +((totalDeploymentCost / grossAnnualSavings) * 12).toFixed(1));
+        const fiveYearNetRoi = Math.round(grossAnnualSavings * 5 - totalDeploymentCost);
+
+        return {
+          annualSavings: grossAnnualSavings,
+          paybackMonths,
+          throughputBoost: preset.throughputGain + Math.min(14, Math.floor(roiUnits / 3)),
+          fiveYearNetRoi,
+          uptimeSla: '99.94%'
+        };
+      }, [roiIndustry, roiUnits, roiShifts, roiFacilitySqFt]);
+
+      // Smooth Animated Numbers
+      const animRuntime = useAnimatedNumber(calculatedInspectorMetrics.estRuntimeHours, 420, 1);
+      const animPowerWatts = useAnimatedNumber(calculatedInspectorMetrics.powerDrawWatts, 420, 0);
+      const animStatorTemp = useAnimatedNumber(calculatedInspectorMetrics.thermalMarginC, 420, 0);
+
+      const animAnnualSavings = useAnimatedNumber(roiResults.annualSavings, 550, 0);
+      const animPaybackMonths = useAnimatedNumber(roiResults.paybackMonths, 500, 1);
+      const animThroughput = useAnimatedNumber(roiResults.throughputBoost, 500, 0);
+      const animFiveYearRoi = useAnimatedNumber(roiResults.fiveYearNetRoi / 1000000, 550, 2);
+
+      const handlePilotSubmit = (e) => {
+        e.preventDefault();
+        if (!pilotForm.fullName.trim() || !pilotForm.workEmail.trim() || !pilotForm.company.trim()) {
+          setPilotFormError('Please complete your name, corporate email, and organization name.');
+          return;
+        }
+        setPilotFormError('');
+        setPilotSubmitted(true);
+      };
+
+      const scrollToSection = (id) => {
+        setMobileMenuOpen(false);
+        const el = document.getElementById(id);
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth' });
+        }
+      };
+
+      return (
+        <div className="min-h-screen bg-[#07090E] text-slate-100 font-sans selection:bg-cyan-400 selection:text-slate-950 overflow-x-hidden">
+          {/* --- TOP STICKY GLASSMORPHIC NAVIGATION BAR --- */}
+          <header className="fixed top-0 left-0 right-0 z-50 border-b border-slate-800/80 bg-[#07090E]/80 backdrop-blur-xl transition-all duration-500">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
+              {/* Brand Logo */}
+              <button
+                onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+                className="flex items-center gap-3 text-left group focus:outline-none cursor-pointer"
+              >
+                <AlgorOhmLogo className="w-10 h-10 transition-transform duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:scale-110 group-hover:rotate-3" />
+                <div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xl font-bold tracking-tight text-white font-display">Algor</span>
+                    <span className="text-xl font-bold tracking-tight text-amber-400 font-display">Ohm</span>
+                    <span className="text-[10px] font-mono uppercase px-1.5 py-0.5 rounded bg-cyan-500/10 text-cyan-400 border border-cyan-500/30">
+                      Ω-SYS
+                    </span>
+                  </div>
+                  <p className="text-[11px] font-mono text-slate-400 tracking-wider uppercase">
+                    Neural Compute × Physical Actuation
+                  </p>
+                </div>
+              </button>
+
+              {/* Desktop Navigation Links */}
+              <nav className="hidden lg:flex items-center gap-6 text-sm font-medium text-slate-300">
+                <button onClick={() => scrollToSection('platforms')} className="hover:text-cyan-400 transition-colors duration-300 cursor-pointer">
+                  Platforms
+                </button>
+                <button onClick={() => scrollToSection('inspector')} className="hover:text-cyan-400 transition-colors duration-300 cursor-pointer">
+                  Spec Inspector
+                </button>
+                <button onClick={() => scrollToSection('architecture')} className="hover:text-cyan-400 transition-colors duration-300 cursor-pointer">
+                  Algor+Ohm Stack
+                </button>
+                <button onClick={() => scrollToSection('field-gallery')} className="hover:text-cyan-400 transition-colors duration-300 cursor-pointer">
+                  Field Optics
+                </button>
+                <button onClick={() => scrollToSection('roi-configurator')} className="hover:text-cyan-400 transition-colors duration-300 cursor-pointer">
+                  Fleet ROI Sim
+                </button>
+              </nav>
+
+              {/* Right Status Badge + Standalone HTML Export + CTA */}
+              <div className="hidden sm:flex items-center gap-3">
+                <button
+                  onClick={() => setCvHudEnabled(!cvHudEnabled)}
+                  title="Toggle Computer Vision Overlays on All Photography"
+                  className={`hidden xl:flex items-center gap-2 px-3 py-1.5 rounded-full border text-xs font-mono transition-all duration-300 cursor-pointer ${
+                    cvHudEnabled
+                      ? 'bg-cyan-500/10 border-cyan-500/40 text-cyan-300'
+                      : 'bg-slate-900/90 border-slate-800 text-slate-400'
+                  }`}
+                >
+                  <Scan className="w-3.5 h-3.5" />
+                  <span>VISION HUD: {cvHudEnabled ? 'ON' : 'OFF'}</span>
+                </button>
+
+                <button
+                  onClick={handleDownloadStandaloneHtml}
+                  title="Download Standalone Single-File .HTML"
+                  className="hidden md:flex items-center gap-1.5 px-3 py-2 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-700 text-xs font-mono transition-all cursor-pointer"
+                >
+                  <Download className="w-3.5 h-3.5 text-amber-400" />
+                  <span>.HTML</span>
+                </button>
+
+                <button
+                  onClick={() => {
+                    setPilotSubmitted(false);
+                    setDemoModalOpen(true);
+                  }}
+                  className="px-4 py-2.5 rounded-lg bg-gradient-to-r from-cyan-500 to-sky-500 hover:from-cyan-400 hover:to-sky-400 text-slate-950 font-semibold text-sm shadow-lg shadow-cyan-500/20 hover:shadow-cyan-400/35 hover:-translate-y-0.5 transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] flex items-center gap-2 cursor-pointer"
+                >
+                  <span>Request Unit Demo</span>
+                  <ArrowUpRight className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Mobile Hamburger Trigger */}
+              <button
+                onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+                className="lg:hidden p-2.5 rounded-lg border border-slate-800 text-slate-300 hover:text-white"
+                aria-label="Toggle Menu"
+              >
+                {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+              </button>
+            </div>
+
+            {/* Mobile Drawer */}
+            {mobileMenuOpen && (
+              <div className="lg:hidden border-t border-slate-800 bg-[#0B0F17] px-6 py-5 space-y-3">
+                <button onClick={() => scrollToSection('platforms')} className="block w-full text-left py-2 text-slate-200 font-medium">
+                  Flagship Platforms
+                </button>
+                <button onClick={() => scrollToSection('inspector')} className="block w-full text-left py-2 text-slate-200 font-medium">
+                  Hardware & Torque Inspector
+                </button>
+                <button onClick={() => scrollToSection('architecture')} className="block w-full text-left py-2 text-slate-200 font-medium">
+                  Dual-Core Stack (Algor + Ohm)
+                </button>
+                <button onClick={() => scrollToSection('field-gallery')} className="block w-full text-left py-2 text-slate-200 font-medium">
+                  Field Deployment Optics
+                </button>
+                <button onClick={() => scrollToSection('roi-configurator')} className="block w-full text-left py-2 text-slate-200 font-medium">
+                  Fleet ROI Configurator
+                </button>
+                <div className="pt-2 flex flex-col gap-2">
+                  <button
+                    onClick={() => setCvHudEnabled(!cvHudEnabled)}
+                    className="w-full py-2.5 rounded-lg bg-slate-900 border border-slate-700 text-cyan-300 font-mono text-xs"
+                  >
+                    VISION HUD: {cvHudEnabled ? 'ENABLED' : 'DISABLED'}
+                  </button>
+                  <button
+                    onClick={handleDownloadStandaloneHtml}
+                    className="w-full py-2.5 rounded-lg bg-slate-900 border border-amber-500/40 text-amber-300 font-mono text-xs flex items-center justify-center gap-2"
+                  >
+                    <Download className="w-4 h-4" />
+                    <span>Download Standalone .HTML</span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      setMobileMenuOpen(false);
+                      setPilotSubmitted(false);
+                      setDemoModalOpen(true);
+                    }}
+                    className="w-full py-3 rounded-lg bg-cyan-400 text-slate-950 font-semibold text-center"
+                  >
+                    Request Unit Demo
+                  </button>
+                </div>
+              </div>
+            )}
+          </header>
+
+          {/* --- 1. HERO SECTION WITH INTERACTIVE 2D KINEMATIC & TELEMETRY VISUALIZER --- */}
+          <section className="relative pt-28 pb-20 lg:pt-36 lg:pb-28 border-b border-slate-800/80 overflow-hidden">
+            <div className="pointer-events-none absolute -top-40 left-1/4 w-96 h-96 bg-cyan-500/10 rounded-full blur-3xl" />
+            <div className="pointer-events-none absolute top-1/3 right-10 w-96 h-96 bg-amber-500/10 rounded-full blur-3xl" />
+
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
+                {/* Left Column: Narrative & Brand Value Proposition */}
+                <div className="lg:col-span-6 space-y-6">
+                  <div className="inline-flex items-center gap-2.5 px-3.5 py-1.5 rounded-full bg-slate-900/90 border border-slate-800 text-xs font-mono">
+                    <span className="px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-300 font-semibold">ALGOR</span>
+                    <span className="text-slate-500">+</span>
+                    <span className="px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 font-semibold">OHM</span>
+                    <span className="text-slate-300">EMBODIED PHYSICAL AI SYSTEMS</span>
+                  </div>
+
+                  <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight text-white leading-[1.08] font-display">
+                    Where Algorithmic Intelligence Meets{' '}
+                    <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-sky-300 to-amber-400">
+                      Physical Resistance.
+                    </span>
+                  </h1>
+
+                  <p className="text-lg text-slate-300 leading-relaxed max-w-xl">
+                    AlgorOhm designs vertically integrated autonomous humanoids, omnidirectional AMRs, and sub-micron manipulators. We fuse{' '}
+                    <span className="text-cyan-300 font-medium">deterministic edge neural networks</span> with{' '}
+                    <span className="text-amber-300 font-medium">sub-milliohm Silicon-Carbide QDD actuators</span> for zero-shot industrial deployment.
+                  </p>
+
+                  {/* Key Engineering Pillars */}
+                  <div className="grid grid-cols-3 gap-4 pt-2 border-y border-slate-800/80 py-5">
+                    <div>
+                      <div className="text-2xl sm:text-3xl font-bold font-mono text-cyan-400">550 TOPS</div>
+                      <div className="text-xs font-mono uppercase text-slate-400 mt-1">Onboard Edge VLA</div>
+                    </div>
+                    <div className="border-x border-slate-800/80 px-4">
+                      <div className="text-2xl sm:text-3xl font-bold font-mono text-amber-400">360 Nm</div>
+                      <div className="text-xs font-mono uppercase text-slate-400 mt-1">Peak QDD Impulse</div>
+                    </div>
+                    <div>
+                      <div className="text-2xl sm:text-3xl font-bold font-mono text-white">0.9 mΩ</div>
+                      <div className="text-xs font-mono uppercase text-slate-400 mt-1">SiC Bus Impedance</div>
+                    </div>
+                  </div>
+
+                  {/* Hero CTAs */}
+                  <div className="flex flex-wrap items-center gap-4 pt-2">
+                    <button
+                      onClick={() => scrollToSection('platforms')}
+                      className="px-6 py-3.5 rounded-xl bg-white text-slate-950 hover:bg-cyan-300 font-semibold text-sm transition-all flex items-center gap-2 shadow-lg cursor-pointer"
+                    >
+                      <span>Explore Robotic Platforms</span>
+                      <ChevronRight className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => scrollToSection('roi-configurator')}
+                      className="px-5 py-3.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-700 font-medium text-sm transition-all flex items-center gap-2 cursor-pointer"
+                    >
+                      <Sliders className="w-4 h-4 text-amber-400" />
+                      <span>Calculate Fleet ROI</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Right Column: Interactive Real-Time 2D Kinematic & Ohm Load Visualizer */}
+                <div className="lg:col-span-6">
+                  <div className="rounded-2xl bg-slate-900/90 border border-slate-800 shadow-2xl overflow-hidden">
+                    <div className="px-4 py-3 bg-slate-950/90 border-b border-slate-800 flex flex-wrap items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <Terminal className="w-4 h-4 text-cyan-400" />
+                        <span className="text-xs font-mono font-semibold tracking-wider uppercase text-slate-200">
+                          LIVE KINEMATIC & OHM TELEMETRYBENCH
+                        </span>
+                      </div>
+
+                      <div className="flex items-center gap-1 bg-slate-900 p-1 rounded-lg border border-slate-800">
+                        {[
+                          { id: 'kinematic', label: 'Torque & Ohm' },
+                          { id: 'lidar', label: 'LiDAR Cloud' },
+                          { id: 'neural', label: 'Neural Spline' }
+                        ].map((m) => (
+                          <button
+                            key={m.id}
+                            onClick={() => setSimMode(m.id)}
+                            className={`px-2.5 py-1 rounded text-[11px] font-mono transition-colors cursor-pointer ${
+                              simMode === m.id
+                                ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40'
+                                : 'text-slate-400 hover:text-slate-200'
+                            }`}
+                          >
+                            {m.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="relative h-80 sm:h-96 w-full bg-[#070A10] select-none">
+                      <canvas
+                        ref={canvasRef}
+                        onClick={handleCanvasInteraction}
+                        onTouchStart={handleCanvasInteraction}
+                        className="w-full h-full block cursor-crosshair"
+                      />
+
+                      <div className="pointer-events-none absolute top-3 left-3 bg-slate-950/85 backdrop-blur-md border border-slate-800/90 rounded-lg p-3 text-[11px] font-mono space-y-1">
+                        <div className="text-cyan-400 font-semibold flex items-center gap-1.5">
+                          <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-ping" />
+                          <span>IK SOLVER: 2.5 kHz HARD-RT</span>
+                        </div>
+                        <div className="text-slate-300">
+                          θ₁: <span className="text-white">{liveTelemetry.j1Angle}°</span> | θ₂:{' '}
+                          <span className="text-white">{liveTelemetry.j2Angle}°</span> | θ₃:{' '}
+                          <span className="text-white">{liveTelemetry.j3Angle}°</span>
+                        </div>
+                        <div className="text-amber-300">
+                          BUS CURRENT: <span className="font-bold">{liveTelemetry.busCurrent} A</span> @{' '}
+                          <span>{liveTelemetry.busImpedance} mΩ</span>
+                        </div>
+                        <div className="text-slate-400">
+                          LOOP LATENCY: <span className="text-emerald-400">{liveTelemetry.loopLatency} ms</span>
+                        </div>
+                      </div>
+
+                      <div className="pointer-events-none absolute bottom-3 right-3 px-2.5 py-1 rounded bg-slate-950/80 border border-slate-800 text-[11px] font-mono text-slate-400">
+                        Click or drag in workspace for spring-damped IK response
+                      </div>
+                    </div>
+
+                    <div className="p-4 bg-slate-950/90 border-t border-slate-800 space-y-3">
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 items-center">
+                        <div>
+                          <div className="flex justify-between text-xs font-mono mb-1">
+                            <span className="text-slate-400">TARGET REACH (X)</span>
+                            <span className="text-cyan-400">{targetX}%</span>
+                          </div>
+                          <input
+                            type="range"
+                            min="35"
+                            max="85"
+                            value={targetX}
+                            onChange={(e) => {
+                              setAutoTrajectory(false);
+                              setTargetX(Number(e.target.value));
+                            }}
+                            className="w-full accent-cyan-400 cursor-pointer"
+                          />
+                        </div>
+
+                        <div>
+                          <div className="flex justify-between text-xs font-mono mb-1">
+                            <span className="text-slate-400">ELEVATION (Z)</span>
+                            <span className="text-cyan-400">{100 - targetY}%</span>
+                          </div>
+                          <input
+                            type="range"
+                            min="18"
+                            max="72"
+                            value={targetY}
+                            onChange={(e) => {
+                              setAutoTrajectory(false);
+                              setTargetY(Number(e.target.value));
+                            }}
+                            className="w-full accent-cyan-400 cursor-pointer"
+                          />
+                        </div>
+
+                        <div>
+                          <div className="flex justify-between text-xs font-mono mb-1">
+                            <span className="text-slate-400">PAYLOAD MASS (Ω)</span>
+                            <span className="text-amber-400">{loadMassKg.toFixed(1)} kg</span>
+                          </div>
+                          <input
+                            type="range"
+                            min="1"
+                            max="35"
+                            step="0.5"
+                            value={loadMassKg}
+                            onChange={(e) => setLoadMassKg(Number(e.target.value))}
+                            className="w-full accent-amber-400 cursor-pointer"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-900 text-xs font-mono text-slate-400">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <button
+                            onClick={() => setSimRunning(!simRunning)}
+                            className="px-2.5 py-1 rounded bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-700 flex items-center gap-1.5 transition-all cursor-pointer"
+                          >
+                            {simRunning ? <Pause className="w-3.5 h-3.5 text-amber-400" /> : <Play className="w-3.5 h-3.5 text-emerald-400" />}
+                            <span>{simRunning ? 'Freeze Solver' : 'Resume Solver'}</span>
+                          </button>
+                          <button
+                            onClick={() => setAutoTrajectory(!autoTrajectory)}
+                            className={`px-2.5 py-1 rounded border flex items-center gap-1.5 transition-all cursor-pointer ${
+                              autoTrajectory
+                                ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500/50'
+                                : 'bg-slate-900 hover:bg-slate-800 text-slate-300 border-slate-800'
+                            }`}
+                          >
+                            <Move className="w-3.5 h-3.5" />
+                            <span>{autoTrajectory ? 'Figure-8 Path: ON' : 'Auto Figure-8 Path'}</span>
+                          </button>
+                          <button
+                            onClick={() => {
+                              setAutoTrajectory(false);
+                              setTargetX(68);
+                              setTargetY(38);
+                              setLoadMassKg(14.5);
+                            }}
+                            className="px-2.5 py-1 rounded bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 flex items-center gap-1 transition-all cursor-pointer"
+                          >
+                            <RotateCcw className="w-3 h-3" />
+                            <span>Home Pose</span>
+                          </button>
+                        </div>
+                        <span className="hidden sm:inline text-emerald-400/90">SPRING-DAMPER: 60FPS LOCKED</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          {/* --- 2. FLAGSHIP ROBOTIC PLATFORMS WITH REAL PHOTOGRAPHY & CV TELEMETRY OVERLAYS --- */}
+          <section id="platforms" className="py-20 lg:py-28 bg-[#0B0F17] text-slate-100 border-b border-slate-800/80">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+              <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-12">
+                <div>
+                  <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-slate-900 border border-slate-800 text-cyan-400 text-xs font-mono uppercase tracking-wider mb-3">
+                    <Boxes className="w-3.5 h-3.5" />
+                    <span>PRODUCTION FLEET LINEUP</span>
+                  </div>
+                  <h2 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-white font-display">
+                    Flagship Autonomous Platforms
+                  </h2>
+                  <p className="text-slate-400 mt-2 max-w-2xl">
+                    Every AlgorOhm unit shares a unified neural software kernel and modular Silicon-Carbide power bus—captured below in active laboratory and cleanroom qualification cells.
+                  </p>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2">
+                  {[
+                    'All',
+                    'Bipedal & Humanoid',
+                    'Autonomous Mobile Robots (AMR)',
+                    'Precision Manipulators',
+                    'All-Terrain Quadrupeds'
+                  ].map((cat) => (
+                    <button
+                      key={cat}
+                      onClick={() => setPlatformCategory(cat)}
+                      className={`px-3.5 py-2 rounded-lg text-xs font-mono font-semibold transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] cursor-pointer ${
+                        platformCategory === cat
+                          ? 'bg-cyan-400 text-slate-950 shadow-lg shadow-cyan-500/20 scale-[1.02]'
+                          : 'bg-slate-900/90 text-slate-400 border border-slate-800 hover:border-slate-700 hover:text-white'
+                      }`}
+                    >
+                      {cat}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                {filteredPlatforms.map((robot) => {
+                  const isSelected = inspectedRobot.id === robot.id;
+                  return (
+                    <SpotlightCard
+                      key={robot.id}
+                      onClick={() => {
+                        setInspectedRobot(robot);
+                        scrollToSection('inspector');
+                      }}
+                      glowColor={isSelected ? 'rgba(0, 229, 255, 0.18)' : 'rgba(245, 158, 11, 0.12)'}
+                      className={`group rounded-2xl bg-slate-900/75 cursor-pointer border transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] hover:-translate-y-1.5 ${
+                        isSelected
+                          ? 'border-cyan-400 shadow-2xl shadow-cyan-500/15'
+                          : 'border-slate-800/90 hover:border-slate-600 shadow-xl'
+                      }`}
+                    >
+                      <div className="relative h-64 sm:h-72 w-full overflow-hidden bg-slate-950">
+                        <img
+                          src={robot.image}
+                          alt={robot.name}
+                          onError={(e) => handleImageError(e, robot.name)}
+                          loading="lazy"
+                          className="w-full h-full object-cover object-center brightness-90 contrast-110 transition-transform duration-700 ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:scale-105"
+                        />
+                        <div className="absolute inset-0 bg-gradient-to-t from-[#0B0F17] via-slate-950/35 to-slate-950/60" />
+
+                        {cvHudEnabled && (
+                          <div className="pointer-events-none absolute inset-x-0 h-16 bg-gradient-to-b from-cyan-400/15 to-transparent animate-scanline" />
+                        )}
+
+                        <div className="absolute top-3.5 left-4 right-4 flex items-center justify-between gap-2 text-[11px] font-mono">
+                          <span className="px-2.5 py-1 rounded bg-slate-950/80 backdrop-blur-md text-slate-300 border border-slate-800 flex items-center gap-1.5">
+                            <Camera className="w-3 h-3 text-cyan-400" />
+                            <span>{robot.cameraMeta}</span>
+                          </span>
+                          <span className="px-3 py-1 rounded-full font-semibold bg-amber-500/20 backdrop-blur-md text-amber-300 border border-amber-500/40">
+                            {robot.dof} DOF
+                          </span>
+                        </div>
+
+                        {cvHudEnabled && (
+                          <div className="pointer-events-none absolute inset-0">
+                            <div
+                              className="absolute border border-cyan-400/60 rounded-sm bg-cyan-500/5 transition-all duration-500 group-hover:border-cyan-300"
+                              style={{
+                                left: robot.cvBoundingBox.x,
+                                top: robot.cvBoundingBox.y,
+                                width: robot.cvBoundingBox.w,
+                                height: robot.cvBoundingBox.h
+                              }}
+                            >
+                              <span className="absolute -top-5 left-0 px-1.5 py-0.5 bg-cyan-400 text-slate-950 text-[9px] font-mono font-bold tracking-wider">
+                                {robot.cvBoundingBox.label}
+                              </span>
+                              <span className="absolute -top-1 -left-1 w-2.5 h-2.5 border-t-2 border-l-2 border-amber-400" />
+                              <span className="absolute -top-1 -right-1 w-2.5 h-2.5 border-t-2 border-r-2 border-amber-400" />
+                              <span className="absolute -bottom-1 -left-1 w-2.5 h-2.5 border-b-2 border-l-2 border-amber-400" />
+                              <span className="absolute -bottom-1 -right-1 w-2.5 h-2.5 border-b-2 border-r-2 border-amber-400" />
+                            </div>
+
+                            {robot.cvKeypoints.map((kp, idx) => (
+                              <div
+                                key={idx}
+                                className="absolute flex items-center gap-1.5"
+                                style={{ left: kp.x, top: kp.y }}
+                              >
+                                <span className="w-2.5 h-2.5 rounded-full bg-amber-400 ring-4 ring-amber-400/25 animate-pulse" />
+                                <span className="px-1.5 py-0.5 rounded bg-slate-950/85 border border-slate-800 text-[9px] font-mono text-cyan-300 whitespace-nowrap">
+                                  {kp.label}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
+                        <div className="absolute bottom-3 left-6 right-6 flex items-end justify-between">
+                          <div>
+                            <span className="text-[10px] font-mono uppercase tracking-widest px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 font-semibold">
+                              {robot.codename}
+                            </span>
+                            <h3 className="text-2xl font-bold text-white mt-1.5 group-hover:text-cyan-300 transition-colors font-display">
+                              {robot.name}
+                            </h3>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="p-6 sm:p-7 flex-1 flex flex-col justify-between">
+                        <div>
+                          <p className="text-sm text-slate-300 leading-relaxed mb-5">{robot.tagline}</p>
+
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6">
+                            <div className="p-3 rounded-xl bg-slate-950/90 border border-cyan-500/25">
+                              <div className="text-[10px] font-mono uppercase text-cyan-400 font-bold flex items-center gap-1">
+                                <Cpu className="w-3.5 h-3.5" />
+                                <span>ALGOR NEURAL CORE</span>
+                              </div>
+                              <div className="text-xs font-semibold text-slate-100 mt-1">{robot.algorRole}</div>
+                            </div>
+                            <div className="p-3 rounded-xl bg-slate-950/90 border border-amber-500/25">
+                              <div className="text-[10px] font-mono uppercase text-amber-400 font-bold flex items-center gap-1">
+                                <Zap className="w-3.5 h-3.5" />
+                                <span>OHM ACTUATION BUS</span>
+                              </div>
+                              <div className="text-xs font-semibold text-slate-100 mt-1">{robot.ohmRole}</div>
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-4 gap-2 py-3.5 px-4 rounded-xl bg-slate-950 border border-slate-800/90 text-white font-mono text-center mb-5">
+                            <div>
+                              <div className="text-[10px] text-slate-400">PEAK TORQUE</div>
+                              <div className="text-sm font-bold text-amber-400">{robot.peakTorque} Nm</div>
+                            </div>
+                            <div className="border-x border-slate-800">
+                              <div className="text-[10px] text-slate-400">COMPUTE</div>
+                              <div className="text-sm font-bold text-cyan-400">{robot.computeTops} TOPS</div>
+                            </div>
+                            <div className="border-r border-slate-800">
+                              <div className="text-[10px] text-slate-400">MAX PAYLOAD</div>
+                              <div className="text-sm font-bold text-white">{robot.maxPayloadKg} kg</div>
+                            </div>
+                            <div>
+                              <div className="text-[10px] text-slate-400">RUNTIME</div>
+                              <div className="text-sm font-bold text-emerald-400">{robot.baseRuntimeHours} hrs</div>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center justify-between pt-3 border-t border-slate-800/80 text-xs font-mono">
+                          <span className="text-slate-400 font-semibold">{robot.priceTier}</span>
+                          <span className="inline-flex items-center gap-1 font-bold text-cyan-400 group-hover:translate-x-1 transition-transform">
+                            <span>Inspect Hardware & Thermal Sim</span>
+                            <ChevronRight className="w-4 h-4" />
+                          </span>
+                        </div>
+                      </div>
+                    </SpotlightCard>
+                  );
+                })}
+              </div>
+
+              {/* --- INTERACTIVE DEEP HARDWARE & SPEC INSPECTOR PANEL --- */}
+              <div
+                id="inspector"
+                className="mt-16 rounded-3xl bg-[#070A10] text-slate-100 border border-slate-800 shadow-2xl overflow-hidden"
+              >
+                <div className="px-6 py-4 bg-slate-950 border-b border-slate-800 flex flex-wrap items-center justify-between gap-4">
+                  <div className="flex items-center gap-3">
+                    <span className="w-2.5 h-2.5 rounded-full bg-cyan-400 animate-pulse" />
+                    <span className="text-xs font-mono uppercase tracking-wider text-slate-300">
+                      DEEP HARDWARE & IMPEDANCE INSPECTOR // SELECTED UNIT:
+                    </span>
+                    <span className="text-sm font-mono font-bold text-cyan-400">{inspectedRobot.name}</span>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    {ROBOT_PLATFORMS.map((r) => (
+                      <button
+                        key={r.id}
+                        onClick={() => setInspectedRobot(r)}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-mono transition-all duration-300 cursor-pointer ${
+                          inspectedRobot.id === r.id
+                            ? 'bg-cyan-400 text-slate-950 font-bold shadow-md shadow-cyan-500/20'
+                            : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'
+                        }`}
+                      >
+                        {r.name.split(' ')[0]}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="p-6 sm:p-10 grid grid-cols-1 lg:grid-cols-12 gap-10">
+                  <div className="lg:col-span-7 space-y-6">
+                    <div className="grid grid-cols-1 sm:grid-cols-12 gap-4">
+                      <div className="sm:col-span-8 relative h-56 rounded-2xl overflow-hidden border border-slate-800 group">
+                        <img
+                          src={inspectedRobot.image}
+                          alt={inspectedRobot.name}
+                          onError={(e) => handleImageError(e, inspectedRobot.name)}
+                          className="w-full h-full object-cover object-center transition-transform duration-700 group-hover:scale-105"
+                        />
+                        <div className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-transparent to-slate-950/40" />
+                        <div className="absolute top-3 left-3 px-2.5 py-1 rounded bg-slate-950/85 border border-slate-800 text-[10px] font-mono text-cyan-400 flex items-center gap-1.5">
+                          <Crosshair className="w-3 h-3" />
+                          <span>OPTICAL FEED // {inspectedRobot.codename}</span>
+                        </div>
+                        <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between text-xs font-mono">
+                          <span className="text-white font-bold">{inspectedRobot.name}</span>
+                          <span className="text-amber-400">{inspectedRobot.nominalImpedance}</span>
+                        </div>
+                      </div>
+
+                      <div className="sm:col-span-4 relative h-56 rounded-2xl overflow-hidden border border-slate-800 group">
+                        <img
+                          src={inspectedRobot.secondaryImage}
+                          alt={`${inspectedRobot.name} Subsystem`}
+                          onError={(e) => handleImageError(e, 'ACTUATOR MACRO')}
+                          className="w-full h-full object-cover object-center transition-transform duration-700 group-hover:scale-110"
+                        />
+                        <div className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-slate-950/20 to-transparent" />
+                        <div className="absolute top-3 left-3 px-2 py-0.5 rounded bg-amber-500/20 border border-amber-500/40 text-[10px] font-mono text-amber-300">
+                          ACTUATOR MACRO
+                        </div>
+                        <div className="absolute bottom-3 left-3 right-3 text-[11px] font-mono text-slate-300">
+                          {inspectedRobot.protectionRating}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2.5 pt-1">
+                      {inspectedRobot.highlights.map((item, idx) => (
+                        <div key={idx} className="flex items-start gap-3 text-sm text-slate-200">
+                          <CheckCircle2 className="w-4 h-4 text-cyan-400 shrink-0 mt-1" />
+                          <span>{item}</span>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="rounded-xl bg-slate-900/90 border border-slate-800 overflow-hidden">
+                      <div className="px-4 py-2.5 bg-slate-950 border-b border-slate-800 text-xs font-mono text-slate-400 uppercase flex justify-between">
+                        <span>Kinematic Actuator Group</span>
+                        <span>Control Loop & Hardware</span>
+                      </div>
+                      <div className="divide-y divide-slate-800/70">
+                        {inspectedRobot.jointBreakdown.map((jb, i) => (
+                          <div key={i} className="px-4 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-1 text-xs font-mono">
+                            <span className="text-slate-200 font-semibold">{jb.group}</span>
+                            <div className="flex items-center gap-3">
+                              <span className="text-amber-400">{jb.actuators}</span>
+                              <span className="px-2 py-0.5 rounded bg-cyan-500/10 text-cyan-300 border border-cyan-500/30">
+                                {jb.loopRate}
+                              </span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Right 5 Cols: Interactive Payload vs. Battery Impedance Simulator */}
+                  <div className="lg:col-span-5 rounded-2xl bg-slate-900/90 border border-slate-800 p-6 flex flex-col justify-between space-y-6">
+                    <div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-mono uppercase text-cyan-400 font-semibold flex items-center gap-1.5">
+                          <BatteryCharging className="w-4 h-4" />
+                          <span>LIVE PAYLOAD × RUNTIME SIMULATOR</span>
+                        </span>
+                        <span className="text-[11px] font-mono text-slate-400">96V SOLID-STATE PACK</span>
+                      </div>
+                      <p className="text-xs text-slate-400 mt-1">
+                        Stress-test how payload mass and shift duty cycle affect continuous runtime and SiC inverter thermal margin.
+                      </p>
+                    </div>
+
+                    <div className="space-y-5">
+                      <div>
+                        <div className="flex justify-between text-xs font-mono mb-1.5">
+                          <span className="text-slate-300">ACTIVE PAYLOAD MASS</span>
+                          <span className="text-amber-400 font-bold">
+                            {inspectorPayloadSim} kg / {inspectedRobot.maxPayloadKg} kg Max
+                          </span>
+                        </div>
+                        <input
+                          type="range"
+                          min="0"
+                          max={inspectedRobot.maxPayloadKg}
+                          step="1"
+                          value={inspectorPayloadSim}
+                          onChange={(e) => setInspectorPayloadSim(Number(e.target.value))}
+                          className="w-full accent-amber-400 cursor-pointer"
+                        />
+                      </div>
+
+                      <div>
+                        <div className="flex justify-between text-xs font-mono mb-1.5">
+                          <span className="text-slate-300">DYNAMIC DUTY CYCLE</span>
+                          <span className="text-cyan-400 font-bold">{inspectorDutyCycle}% Continuous Motion</span>
+                        </div>
+                        <input
+                          type="range"
+                          min="25"
+                          max="100"
+                          step="5"
+                          value={inspectorDutyCycle}
+                          onChange={(e) => setInspectorDutyCycle(Number(e.target.value))}
+                          className="w-full accent-cyan-400 cursor-pointer"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-3 pt-2">
+                      <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 text-center">
+                        <div className="text-[10px] font-mono text-slate-400">EST. RUNTIME</div>
+                        <div className="text-xl font-bold font-mono text-emerald-400 mt-1">
+                          {animRuntime}h
+                        </div>
+                      </div>
+                      <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 text-center">
+                        <div className="text-[10px] font-mono text-slate-400">AVG POWER DRAW</div>
+                        <div className="text-xl font-bold font-mono text-amber-400 mt-1">
+                          {animPowerWatts}W
+                        </div>
+                      </div>
+                      <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 text-center">
+                        <div className="text-[10px] font-mono text-slate-400">STATOR TEMP</div>
+                        <div className="text-xl font-bold font-mono text-cyan-400 mt-1">
+                          {animStatorTemp}°C
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3 text-xs font-mono">
+                      <div className="p-3 rounded-xl bg-slate-950 border border-slate-800">
+                        <div className="text-slate-400">CHASSIS MASS</div>
+                        <div className="text-white font-bold mt-0.5">{inspectedRobot.weightKg} kg</div>
+                      </div>
+                      <div className="p-3 rounded-xl bg-slate-950 border border-slate-800">
+                        <div className="text-slate-400">VERTICAL SPAN</div>
+                        <div className="text-white font-bold mt-0.5">{inspectedRobot.heightCm} cm</div>
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={() => {
+                        setPilotForm((prev) => ({ ...prev, platformInterest: inspectedRobot.name }));
+                        setPilotSubmitted(false);
+                        setDemoModalOpen(true);
+                      }}
+                      className="w-full py-3.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-bold text-sm transition-all duration-300 hover:-translate-y-0.5 shadow-lg shadow-amber-500/20 flex items-center justify-center gap-2 cursor-pointer"
+                    >
+                      <span>Reserve {inspectedRobot.name} Pilot Evaluation</span>
+                      <ArrowUpRight className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          {/* --- 3. THE DUAL-CORE STACK (ALGOR NEURAL + OHM HARDWARE EXPLORER WITH REAL PHOTOS) --- */}
+          <section id="architecture" className="py-20 lg:py-28 bg-[#07090E] border-b border-slate-800">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+              <div className="text-center max-w-3xl mx-auto mb-12">
+                <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-slate-900 border border-slate-800 text-xs font-mono text-cyan-400 mb-3">
+                  <Layers className="w-3.5 h-3.5" />
+                  <span>FULL-STACK VERTICAL INTEGRATION</span>
+                </div>
+                <h2 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight font-display">
+                  The Dual-Core Engineering Stack
+                </h2>
+                <p className="text-slate-400 mt-3">
+                  Conventional robotics companies buy off-the-shelf motors and bolt on cloud AI. AlgorOhm co-designs the{' '}
+                  <span className="text-cyan-300">Algor™ neural control stack</span> and{' '}
+                  <span className="text-amber-300">Ohm™ low-impedance actuators</span> so software directly senses physical torque at 4,000 Hz.
+                </p>
+
+                <div className="inline-flex p-1.5 rounded-2xl bg-slate-900 border border-slate-800 mt-8">
+                  <button
+                    onClick={() => setActiveStackTab('algor')}
+                    className={`px-5 py-2.5 rounded-xl text-xs sm:text-sm font-mono font-bold transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] cursor-pointer flex items-center gap-2 ${
+                      activeStackTab === 'algor'
+                        ? 'bg-cyan-400 text-slate-950 shadow-lg shadow-cyan-500/20 scale-[1.02]'
+                        : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    <Cpu className="w-4 h-4" />
+                    <span>Algor™ Neural Stack</span>
+                  </button>
+                  <button
+                    onClick={() => setActiveStackTab('ohm')}
+                    className={`px-5 py-2.5 rounded-xl text-xs sm:text-sm font-mono font-bold transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] cursor-pointer flex items-center gap-2 ${
+                      activeStackTab === 'ohm'
+                        ? 'bg-amber-400 text-slate-950 shadow-lg shadow-amber-500/20 scale-[1.02]'
+                        : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    <Zap className="w-4 h-4" />
+                    <span>Ohm™ Hardware Core</span>
+                  </button>
+                </div>
+              </div>
+
+              {(() => {
+                const stack = ARCHITECTURE_STACK[activeStackTab];
+                const isAlgor = activeStackTab === 'algor';
+                return (
+                  <div className="rounded-3xl bg-slate-900/70 border border-slate-800 p-6 sm:p-10 space-y-10 transition-all duration-500">
+                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center pb-8 border-b border-slate-800">
+                      <div className="lg:col-span-7 space-y-4">
+                        <span
+                          className={`inline-block text-xs font-mono uppercase tracking-widest px-3 py-1 rounded-full font-semibold ${
+                            isAlgor
+                              ? 'bg-cyan-500/15 text-cyan-300 border border-cyan-500/30'
+                              : 'bg-amber-500/15 text-amber-300 border border-amber-500/30'
+                          }`}
+                        >
+                          {stack.badge}
+                        </span>
+                        <h3 className="text-2xl sm:text-3xl font-bold text-white font-display">{stack.title}</h3>
+                        <p className="text-slate-300 text-sm leading-relaxed">{stack.subtitle}</p>
+
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2">
+                          {stack.metrics.map((m, idx) => (
+                            <div key={idx} className="p-3.5 rounded-2xl bg-slate-950 border border-slate-800/90">
+                              <div className="text-[11px] font-mono text-slate-400">{m.label}</div>
+                              <div
+                                className={`text-xl font-extrabold font-mono mt-1 ${
+                                  isAlgor ? 'text-cyan-400' : 'text-amber-400'
+                                }`}
+                              >
+                                {m.value}
+                              </div>
+                              <div className="text-[10px] text-slate-500 mt-0.5">{m.detail}</div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div className="lg:col-span-5">
+                        <div className="relative h-64 rounded-2xl overflow-hidden border border-slate-700/80 group">
+                          <img
+                            src={stack.heroPhoto}
+                            alt={stack.title}
+                            onError={(e) => handleImageError(e, stack.title)}
+                            className="w-full h-full object-cover object-center transition-transform duration-700 group-hover:scale-105"
+                          />
+                          <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/25 to-transparent" />
+                          <div className="absolute top-3 left-3 px-2.5 py-1 rounded bg-slate-950/85 border border-slate-800 text-[10px] font-mono text-cyan-300">
+                            HARDWARE VERIFICATION LAB
+                          </div>
+                          <div className="absolute bottom-3 left-3 right-3 text-[11px] font-mono text-slate-200 bg-slate-950/80 backdrop-blur-md p-2.5 rounded-lg border border-slate-800">
+                            {stack.photoCaption}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      {stack.modules.map((mod) => (
+                        <SpotlightCard
+                          key={mod.code}
+                          glowColor={isAlgor ? 'rgba(0, 229, 255, 0.14)' : 'rgba(245, 158, 11, 0.14)'}
+                          className="p-6 rounded-2xl bg-slate-950/90 border border-slate-800/90 hover:border-slate-700"
+                        >
+                          <div>
+                            <div className="flex items-center justify-between mb-3">
+                              <span
+                                className={`text-xs font-mono font-bold px-2.5 py-1 rounded ${
+                                  isAlgor ? 'bg-cyan-500/10 text-cyan-400' : 'bg-amber-500/10 text-amber-400'
+                                }`}
+                              >
+                                {mod.code}
+                              </span>
+                              <span className="text-[11px] font-mono text-slate-500">SIL-3 CERTIFIED</span>
+                            </div>
+                            <h4 className="text-lg font-bold text-white font-display">{mod.name}</h4>
+                            <p className="text-sm text-slate-400 mt-2 leading-relaxed">{mod.desc}</p>
+                          </div>
+
+                          <div className="flex flex-wrap gap-2 mt-6 pt-4 border-t border-slate-900">
+                            {mod.specs.map((sp, i) => (
+                              <span
+                                key={i}
+                                className="text-[11px] font-mono px-2.5 py-1 rounded-md bg-slate-900 text-slate-300 border border-slate-800"
+                              >
+                                {sp}
+                              </span>
+                            ))}
+                          </div>
+                        </SpotlightCard>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
+          </section>
+
+          {/* --- 4. FIELD DEPLOYMENT & R&D OPTICS GALLERY (REAL PHOTOGRAPHY + LIGHTBOX) --- */}
+          <section id="field-gallery" className="py-20 lg:py-28 bg-[#0B0F17] border-b border-slate-800">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+              <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-12">
+                <div>
+                  <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-slate-900 border border-slate-800 text-amber-400 text-xs font-mono uppercase mb-3">
+                    <Camera className="w-3.5 h-3.5" />
+                    <span>OPTICAL VERIFICATION ARCHIVE</span>
+                  </div>
+                  <h2 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight font-display">
+                    Field Deployment & R&D Lab Optics
+                  </h2>
+                  <p className="text-slate-400 mt-2 max-w-2xl">
+                    Real high-speed optical captures from our Dresden wafer cleanrooms, Zurich dynamometer testbeds, and Stuttgart automotive body-in-white deployments.
+                  </p>
+                </div>
+                <button
+                  onClick={() => setCvHudEnabled(!cvHudEnabled)}
+                  className="self-start md:self-auto px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-xs font-mono text-cyan-400 flex items-center gap-2 cursor-pointer"
+                >
+                  <Scan className="w-4 h-4" />
+                  <span>{cvHudEnabled ? 'Disable Telemetry Reticles' : 'Enable Telemetry Reticles'}</span>
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {FIELD_GALLERY.map((item) => (
+                  <div
+                    key={item.id}
+                    onClick={() => setLightboxPhoto(item)}
+                    className="group relative h-80 sm:h-96 rounded-2xl overflow-hidden border border-slate-800 hover:border-cyan-400/60 bg-slate-950 cursor-pointer transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] hover:-translate-y-1 shadow-xl"
+                  >
+                    <img
+                      src={item.image}
+                      alt={item.title}
+                      onError={(e) => handleImageError(e, item.title)}
+                      loading="lazy"
+                      className="w-full h-full object-cover object-center brightness-90 contrast-110 transition-transform duration-700 ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:scale-105"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-[#07090E] via-slate-950/30 to-slate-950/60" />
+
+                    <div className="absolute top-4 left-4 right-4 flex items-center justify-between gap-2 text-[11px] font-mono">
+                      <span
+                        className={`px-2.5 py-1 rounded font-semibold backdrop-blur-md border ${
+                          item.accent === 'cyan'
+                            ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500/40'
+                            : 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+                        }`}
+                      >
+                        {item.tag}
+                      </span>
+                      <span className="px-2.5 py-1 rounded bg-slate-950/80 text-slate-300 border border-slate-800 flex items-center gap-1.5">
+                        <span>{item.camera}</span>
+                        <Maximize2 className="w-3 h-3 text-cyan-400" />
+                      </span>
+                    </div>
+
+                    {cvHudEnabled && (
+                      <div className="pointer-events-none absolute inset-0 flex items-center justify-center opacity-60 group-hover:opacity-100 transition-opacity">
+                        <div className="w-28 h-28 border border-dashed border-cyan-400/50 rounded-full flex items-center justify-center">
+                          <div className="w-2 h-2 rounded-full bg-amber-400" />
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="absolute bottom-4 left-5 right-5 space-y-2">
+                      <div className="text-xs font-mono text-slate-400">{item.location}</div>
+                      <h3 className="text-xl font-bold text-white group-hover:text-cyan-300 transition-colors font-display">
+                        {item.title}
+                      </h3>
+                      <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between text-[11px] font-mono text-emerald-400">
+                        <span>{item.telemetry}</span>
+                        <span className="text-slate-300 group-hover:text-white">Inspect High-Res →</span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </section>
+
+          {/* --- 5. LIVE FLEET ROI & DEPLOYMENT CONFIGURATOR WITH SMOOTH ANIMATED NUMBERS --- */}
+          <section id="roi-configurator" className="py-20 lg:py-28 bg-[#0E1420] border-b border-slate-800">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-start">
+                <div className="lg:col-span-6 space-y-8">
+                  <div>
+                    <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs font-mono uppercase mb-3">
+                      <Gauge className="w-3.5 h-3.5" />
+                      <span>ENTERPRISE DEPLOYMENT ECONOMICS</span>
+                    </div>
+                    <h2 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight font-display">
+                      Live Fleet ROI & Payback Configurator
+                    </h2>
+                    <p className="text-slate-400 mt-2 text-sm sm:text-base">
+                      Model the financial and operational impact of deploying an integrated AlgorOhm autonomous fleet across your manufacturing or inspection facility.
+                    </p>
+                  </div>
+
+                  <div className="space-y-2.5">
+                    <label className="text-xs font-mono uppercase text-slate-400 block">
+                      1. Select Target Industrial Sector
+                    </label>
+                    <div className="grid grid-cols-2 gap-3">
+                      {[
+                        { id: 'semiconductor', label: 'Semiconductor & Cleanroom', icon: Microchip },
+                        { id: 'aerospace', label: 'Aerospace & Defense Mfg', icon: Plane },
+                        { id: 'logistics', label: 'High-Density 3PL Logistics', icon: Factory },
+                        { id: 'energy', label: 'Offshore & HV Grid Inspection', icon: Anchor }
+                      ].map((ind) => {
+                        const IconComponent = ind.icon;
+                        const active = roiIndustry === ind.id;
+                        return (
+                          <button
+                            key={ind.id}
+                            onClick={() => setRoiIndustry(ind.id)}
+                            className={`p-3.5 rounded-xl border text-left transition-all flex items-center gap-3 cursor-pointer ${
+                              active
+                                ? 'bg-cyan-500/15 border-cyan-400 text-white shadow-md'
+                                : 'bg-slate-900/80 border-slate-800 text-slate-400 hover:border-slate-700'
+                            }`}
+                          >
+                            <IconComponent className={`w-5 h-5 shrink-0 ${active ? 'text-cyan-400' : 'text-slate-500'}`} />
+                            <span className="text-xs font-semibold leading-tight">{ind.label}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <div className="space-y-6 p-6 rounded-2xl bg-slate-900/90 border border-slate-800">
+                    <div>
+                      <div className="flex justify-between text-xs font-mono mb-2">
+                        <span className="text-slate-300">2. NUMBER OF ALGOROHM UNITS</span>
+                        <span className="text-cyan-400 font-bold">{roiUnits} Autonomous Units</span>
+                      </div>
+                      <input
+                        type="range"
+                        min="2"
+                        max="60"
+                        value={roiUnits}
+                        onChange={(e) => setRoiUnits(Number(e.target.value))}
+                        className="w-full accent-cyan-400 cursor-pointer"
+                      />
+                      <div className="flex justify-between text-[10px] font-mono text-slate-500 mt-1">
+                        <span>2 Units (Cell Pilot)</span>
+                        <span>30 Units (Plant Floor)</span>
+                        <span>60 Units (Full Swarm)</span>
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="flex justify-between text-xs font-mono mb-2">
+                        <span className="text-slate-300">3. DAILY SHIFT OPERATIONS</span>
+                        <span className="text-amber-400 font-bold">{roiShifts} Shifts ({roiShifts * 8} hrs/day)</span>
+                      </div>
+                      <div className="grid grid-cols-3 gap-3">
+                        {[1, 2, 3].map((sh) => (
+                          <button
+                            key={sh}
+                            onClick={() => setRoiShifts(sh)}
+                            className={`py-2 rounded-lg text-xs font-mono font-semibold border cursor-pointer ${
+                              roiShifts === sh
+                                ? 'bg-amber-500/20 border-amber-400 text-amber-300'
+                                : 'bg-slate-950 border-slate-800 text-slate-400'
+                            }`}
+                          >
+                            {sh} {sh === 1 ? 'Shift (8h)' : sh === 2 ? 'Shifts (16h)' : 'Shifts (24/7)'}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="flex justify-between text-xs font-mono mb-2">
+                        <span className="text-slate-300">4. ACTIVE FACILITY FOOTPRINT</span>
+                        <span className="text-white font-bold">{roiFacilitySqFt.toLocaleString()} sq. ft.</span>
+                      </div>
+                      <input
+                        type="range"
+                        min="25000"
+                        max="500000"
+                        step="25000"
+                        value={roiFacilitySqFt}
+                        onChange={(e) => setRoiFacilitySqFt(Number(e.target.value))}
+                        className="w-full accent-cyan-400 cursor-pointer"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Right 6 Cols: Live Financial & Throughput Output Dashboard */}
+                <div className="lg:col-span-6 rounded-3xl bg-slate-950 border border-slate-800 p-6 sm:p-10 shadow-2xl space-y-8">
+                  <div className="flex items-center justify-between border-b border-slate-800 pb-5">
+                    <div>
+                      <span className="text-xs font-mono text-emerald-400 uppercase">PROJECTED FLEET TELEMETRY</span>
+                      <h3 className="text-2xl font-bold text-white mt-1 font-display">Estimated Economic Impact</h3>
+                    </div>
+                    <span className="px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 text-xs font-mono">
+                      SLA {roiResults.uptimeSla}
+                    </span>
+                  </div>
+
+                  <div className="p-6 rounded-2xl bg-gradient-to-br from-slate-900 via-slate-900 to-cyan-950/40 border border-cyan-500/30">
+                    <div className="text-xs font-mono uppercase text-cyan-300">ESTIMATED ANNUAL OPEX SAVINGS</div>
+                    <div className="text-4xl sm:text-5xl font-extrabold font-mono text-white mt-2">
+                      ${animAnnualSavings.toLocaleString()}
+                      <span className="text-lg font-normal text-slate-400"> / yr</span>
+                    </div>
+                    <p className="text-xs text-slate-400 mt-2">
+                      Includes direct labor reallocation, zero-defect scrap reduction, and 34.5% regenerative power recovery.
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800">
+                      <div className="text-xs font-mono text-slate-400">CAPEX PAYBACK</div>
+                      <div className="text-2xl font-bold font-mono text-amber-400 mt-1">
+                        {animPaybackMonths} mos
+                      </div>
+                      <div className="text-[11px] text-slate-500 mt-0.5">Full hardware amortization</div>
+                    </div>
+
+                    <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800">
+                      <div className="text-xs font-mono text-slate-400">THROUGHPUT BOOST</div>
+                      <div className="text-2xl font-bold font-mono text-cyan-400 mt-1">
+                        +{animThroughput}%
+                      </div>
+                      <div className="text-[11px] text-slate-500 mt-0.5">Cycle efficiency gain</div>
+                    </div>
+
+                    <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800">
+                      <div className="text-xs font-mono text-slate-400">5-YEAR NET ROI</div>
+                      <div className="text-2xl font-bold font-mono text-emerald-400 mt-1">
+                        ${animFiveYearRoi}M
+                      </div>
+                      <div className="text-[11px] text-slate-500 mt-0.5">Net cumulative value</div>
+                    </div>
+                  </div>
+
+                  <div className="pt-2 flex flex-col sm:flex-row items-center justify-between gap-4">
+                    <div className="text-xs text-slate-400">
+                      Want a custom CAD cell simulation with your STEP files?
+                    </div>
+                    <button
+                      onClick={() => {
+                        setPilotForm((prev) => ({
+                          ...prev,
+                          deploymentScale: `${roiUnits} Units (${roiIndustry.toUpperCase()})`
+                        }));
+                        setPilotSubmitted(false);
+                        setDemoModalOpen(true);
+                      }}
+                      className="w-full sm:w-auto px-5 py-3 rounded-xl bg-cyan-400 hover:bg-cyan-300 text-slate-950 font-bold text-xs font-mono uppercase tracking-wider transition-all cursor-pointer shrink-0"
+                    >
+                      Export Custom Fleet Proposal
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          {/* --- 6. R&D WHITEPAPERS & TECHNICAL PUBLICATIONS --- */}
+          <section id="research" className="py-20 lg:py-28 bg-[#0B0F17] border-b border-slate-800">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+              <div className="flex flex-col md:flex-row md:items-end justify-between mb-12 gap-4">
+                <div>
+                  <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-slate-900 border border-slate-800 text-xs font-mono text-cyan-400 mb-3">
+                    <FileText className="w-3.5 h-3.5" />
+                    <span>PEER-REVIEWED RESEARCH & BENCHMARKS</span>
+                  </div>
+                  <h2 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight font-display">
+                    AlgorOhm Lab Technical Monographs
+                  </h2>
+                </div>
+                <p className="text-sm text-slate-400 max-w-md">
+                  We publish open hardware impedance benchmarks and deterministic control proofs from our Zurich, Boston, and Tokyo R&D centers.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                {WHITEPAPERS.map((wp) => (
+                  <div
+                    key={wp.id}
+                    className="rounded-2xl bg-slate-900/75 border border-slate-800 hover:border-cyan-500/50 p-6 flex flex-col justify-between transition-all"
+                  >
+                    <div>
+                      <div className="flex items-center justify-between text-xs font-mono mb-4">
+                        <span className="px-2.5 py-1 rounded bg-slate-950 text-cyan-400 border border-slate-800">
+                          {wp.code}
+                        </span>
+                        <span className="text-amber-400">{wp.category}</span>
+                      </div>
+                      <h3 className="text-lg font-bold text-white leading-snug font-display">{wp.title}</h3>
+                      <p className="text-xs font-mono text-slate-400 mt-2">{wp.authors}</p>
+                      <p className="text-sm text-slate-300 mt-4 leading-relaxed">{wp.abstract}</p>
+                    </div>
+
+                    <div className="pt-6 mt-6 border-t border-slate-800/80 flex items-center justify-between text-xs font-mono">
+                      <span className="text-slate-400">
+                        {wp.date} • {wp.pages}
+                      </span>
+                      <button
+                        onClick={() => setSelectedWhitepaper(wp)}
+                        className="text-cyan-400 hover:text-cyan-300 font-semibold flex items-center gap-1 cursor-pointer"
+                      >
+                        <span>Read Executive Brief</span>
+                        <ArrowUpRight className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </section>
+
+          {/* --- 7. FOOTER WITH QUICK PILOT CONVERSION & STANDALONE DOWNLOAD --- */}
+          <footer className="bg-[#070A10] text-slate-400 py-16 border-t border-slate-900">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+              <div className="grid grid-cols-1 md:grid-cols-12 gap-10 pb-12 border-b border-slate-800/80">
+                <div className="md:col-span-5 space-y-4">
+                  <div className="flex items-center gap-3">
+                    <AlgorOhmLogo className="w-9 h-9" />
+                    <span className="text-xl font-bold text-white font-display">
+                      Algor<span className="text-amber-400">Ohm</span> Robotics Inc.
+                    </span>
+                  </div>
+                  <p className="text-sm text-slate-400 max-w-sm leading-relaxed">
+                    Engineering embodied intelligence where millisecond neural perception converges with ultra-low-impedance electromechanical actuation.
+                  </p>
+                  <div className="flex flex-wrap items-center gap-3 pt-1">
+                    <span className="text-xs font-mono text-slate-500">
+                      ISO 10218-1 / ISO/TS 15066 Certified
+                    </span>
+                    <button
+                      onClick={handleDownloadStandaloneHtml}
+                      className="px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-amber-300 border border-slate-800 text-xs font-mono flex items-center gap-1.5 cursor-pointer"
+                    >
+                      <Download className="w-3.5 h-3.5" />
+                      <span>Download Standalone .HTML</span>
+                    </button>
+                  </div>
+                </div>
+
+                <div className="md:col-span-2 space-y-2 text-sm">
+                  <div className="font-mono text-xs uppercase text-white font-semibold mb-3">Platforms</div>
+                  <button onClick={() => scrollToSection('platforms')} className="block hover:text-cyan-400 cursor-pointer">Ohm-X1 Humanoid</button>
+                  <button onClick={() => scrollToSection('platforms')} className="block hover:text-cyan-400 cursor-pointer">Vortex-AMR 400</button>
+                  <button onClick={() => scrollToSection('platforms')} className="block hover:text-cyan-400 cursor-pointer">Kinetix-7 Cobot</button>
+                  <button onClick={() => scrollToSection('platforms')} className="block hover:text-cyan-400 cursor-pointer">Strider-Q8 Quadruped</button>
+                </div>
+
+                <div className="md:col-span-2 space-y-2 text-sm">
+                  <div className="font-mono text-xs uppercase text-white font-semibold mb-3">Architecture</div>
+                  <button onClick={() => scrollToSection('architecture')} className="block hover:text-cyan-400 cursor-pointer">AlgorOS 4.2 RTOS</button>
+                  <button onClick={() => scrollToSection('architecture')} className="block hover:text-cyan-400 cursor-pointer">QDD Halbach Motors</button>
+                  <button onClick={() => scrollToSection('architecture')} className="block hover:text-cyan-400 cursor-pointer">SiC Power Stage</button>
+                  <button onClick={() => scrollToSection('roi-configurator')} className="block hover:text-cyan-400 cursor-pointer">Swarm Mesh SDK</button>
+                </div>
+
+                <div className="md:col-span-3 space-y-3">
+                  <div className="font-mono text-xs uppercase text-white font-semibold">Global R&D Hubs</div>
+                  <p className="text-xs text-slate-400 font-mono">
+                    • BOSTON // 440 Artisan Way, Somerville, MA<br />
+                    • ZURICH // Technoparkstrasse 1, 8005<br />
+                    • TOKYO // Koto-ku Robotics Bay
+                  </p>
+                  <button
+                    onClick={() => {
+                      setPilotSubmitted(false);
+                      setDemoModalOpen(true);
+                    }}
+                    className="mt-2 px-4 py-2 rounded-lg bg-slate-900 hover:bg-slate-800 text-cyan-400 border border-slate-800 text-xs font-mono cursor-pointer"
+                  >
+                    Schedule Engineering Briefing →
+                  </button>
+                </div>
+              </div>
+
+              <div className="pt-8 flex flex-col sm:flex-row items-center justify-between text-xs font-mono text-slate-500 gap-4">
+                <div>© {new Date().getFullYear()} AlgorOhm Robotics Inc. All rights reserved.</div>
+                <div className="flex gap-6">
+                  <span>TELEMETRY STATUS: NOMINAL (99.98%)</span>
+                  <span>SECURITY: FIPS 140-3 EDGE</span>
+                </div>
+              </div>
+            </div>
+          </footer>
+
+          {/* --- MODAL 1: REQUEST UNIT DEMO / PILOT DEPLOYMENT CONSULTATION --- */}
+          {demoModalOpen && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md">
+              <div className="relative w-full max-w-lg rounded-2xl bg-[#0E1420] border border-slate-700 p-6 sm:p-8 shadow-2xl text-slate-100">
+                <button
+                  onClick={() => setDemoModalOpen(false)}
+                  className="absolute top-5 right-5 p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+
+                {!pilotSubmitted ? (
+                  <form onSubmit={handlePilotSubmit} className="space-y-4">
+                    <div className="flex items-center gap-2.5">
+                      <AlgorOhmLogo className="w-8 h-8" />
+                      <span className="text-xs font-mono uppercase text-cyan-400 font-semibold">
+                        DEPLOYMENT ENGINEERING BRIEFING
+                      </span>
+                    </div>
+                    <h3 className="text-2xl font-bold text-white font-display">Request Unit Demo & Pilot</h3>
+                    <p className="text-xs text-slate-400">
+                      Connect directly with an AlgorOhm Systems Architect to schedule a live telemetry demonstration or on-site pilot cell evaluation.
+                    </p>
+
+                    {pilotFormError && (
+                      <div className="p-3 rounded-lg bg-rose-500/15 border border-rose-500/40 text-xs text-rose-300">
+                        {pilotFormError}
+                      </div>
+                    )}
+
+                    <div>
+                      <label className="block text-xs font-mono text-slate-300 mb-1">FULL NAME *</label>
+                      <input
+                        type="text"
+                        placeholder="Dr. Elena Vance"
+                        value={pilotForm.fullName}
+                        onChange={(e) => setPilotForm({ ...pilotForm, fullName: e.target.value })}
+                        className="w-full px-3.5 py-2.5 rounded-lg bg-slate-950 border border-slate-800 text-sm text-white focus:border-cyan-400 focus:outline-none"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-mono text-slate-300 mb-1">WORK EMAIL *</label>
+                        <input
+                          type="email"
+                          placeholder="elena@aerofab.com"
+                          value={pilotForm.workEmail}
+                          onChange={(e) => setPilotForm({ ...pilotForm, workEmail: e.target.value })}
+                          className="w-full px-3.5 py-2.5 rounded-lg bg-slate-950 border border-slate-800 text-sm text-white focus:border-cyan-400 focus:outline-none"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-mono text-slate-300 mb-1">ORGANIZATION *</label>
+                        <input
+                          type="text"
+                          placeholder="AeroFab Dynamics"
+                          value={pilotForm.company}
+                          onChange={(e) => setPilotForm({ ...pilotForm, company: e.target.value })}
+                          className="w-full px-3.5 py-2.5 rounded-lg bg-slate-950 border border-slate-800 text-sm text-white focus:border-cyan-400 focus:outline-none"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-mono text-slate-300 mb-1">PRIMARY PLATFORM</label>
+                        <select
+                          value={pilotForm.platformInterest}
+                          onChange={(e) => setPilotForm({ ...pilotForm, platformInterest: e.target.value })}
+                          className="w-full px-3.5 py-2.5 rounded-lg bg-slate-950 border border-slate-800 text-sm text-white focus:border-cyan-400 focus:outline-none"
+                        >
+                          {ROBOT_PLATFORMS.map((r) => (
+                            <option key={r.id} value={r.name}>
+                              {r.name}
+                            </option>
+                          ))}
+                          <option value="Heterogeneous Swarm Fleet">Heterogeneous Swarm Fleet</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-mono text-slate-300 mb-1">TARGET SCALE</label>
+                        <input
+                          type="text"
+                          value={pilotForm.deploymentScale}
+                          onChange={(e) => setPilotForm({ ...pilotForm, deploymentScale: e.target.value })}
+                          className="w-full px-3.5 py-2.5 rounded-lg bg-slate-950 border border-slate-800 text-sm text-white focus:border-cyan-400 focus:outline-none"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-mono text-slate-300 mb-1">
+                        PAYLOAD / CYCLE TIME REQUIREMENTS (OPTIONAL)
+                      </label>
+                      <textarea
+                        rows={2}
+                        placeholder="e.g., 14kg wafer cassettes, ISO Class 4 cleanroom, 24/7 shift handoff..."
+                        value={pilotForm.environmentNotes}
+                        onChange={(e) => setPilotForm({ ...pilotForm, environmentNotes: e.target.value })}
+                        className="w-full px-3.5 py-2 rounded-lg bg-slate-950 border border-slate-800 text-sm text-white focus:border-cyan-400 focus:outline-none"
+                      />
+                    </div>
+
+                    <button
+                      type="submit"
+                      className="w-full py-3.5 rounded-xl bg-gradient-to-r from-cyan-500 to-sky-500 hover:from-cyan-400 hover:to-sky-400 text-slate-950 font-bold text-sm transition-all cursor-pointer"
+                    >
+                      Confirm Pilot Engineering Allocation
+                    </button>
+                  </form>
+                ) : (
+                  <div className="py-6 text-center space-y-4">
+                    <div className="w-14 h-14 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 flex items-center justify-center mx-auto">
+                      <CheckCircle2 className="w-8 h-8" />
+                    </div>
+                    <h4 className="text-2xl font-bold text-white font-display">Telemetry Briefing Scheduled</h4>
+                    <p className="text-sm text-slate-300 max-w-md mx-auto">
+                      Thank you, <span className="text-cyan-300 font-semibold">{pilotForm.fullName}</span>. Our Deployment Engineering team has logged your request for{' '}
+                      <span className="text-amber-300 font-semibold">{pilotForm.platformInterest}</span> ({pilotForm.deploymentScale}).
+                    </p>
+                    <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 text-xs font-mono text-slate-400">
+                      DISPATCH ID: ALG-{Math.floor(100000 + Math.random() * 900000)} • SLA RESPONSE &lt; 4 HOURS
+                    </div>
+                    <button
+                      onClick={() => setDemoModalOpen(false)}
+                      className="px-6 py-2.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-white text-xs font-mono uppercase cursor-pointer"
+                    >
+                      Return to Control Center
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* --- MODAL 2: WHITEPAPER EXECUTIVE BRIEF VIEWER --- */}
+          {selectedWhitepaper && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md">
+              <div className="relative w-full max-w-xl rounded-2xl bg-[#0E1420] border border-slate-700 p-6 sm:p-8 shadow-2xl text-slate-100 space-y-4">
+                <button
+                  onClick={() => setSelectedWhitepaper(null)}
+                  className="absolute top-5 right-5 p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+                <div className="text-xs font-mono text-cyan-400">
+                  {selectedWhitepaper.code} // {selectedWhitepaper.category}
+                </div>
+                <h3 className="text-xl font-bold text-white pr-6 font-display">{selectedWhitepaper.title}</h3>
+                <p className="text-xs font-mono text-slate-400">{selectedWhitepaper.authors}</p>
+                <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 text-sm text-slate-300 leading-relaxed space-y-2">
+                  <div className="text-xs font-mono uppercase text-amber-400">Executive Technical Abstract:</div>
+                  <p>{selectedWhitepaper.abstract}</p>
+                  <p className="text-xs text-slate-400 pt-2">
+                    Key Result: Verified across 10,000+ hours of continuous dynamometer and bipedal gait testing with 0.9 mΩ SiC inverter buses and AlgorOS 4.2.
+                  </p>
+                </div>
+                <div className="flex justify-end gap-3 pt-2">
+                  <button
+                    onClick={() => setSelectedWhitepaper(null)}
+                    className="px-4 py-2 rounded-lg bg-slate-800 text-slate-300 text-xs font-mono cursor-pointer"
+                  >
+                    Close Preview
+                  </button>
+                  <button
+                    onClick={() => {
+                      const wpTitle = selectedWhitepaper.title;
+                      setSelectedWhitepaper(null);
+                      setPilotForm((prev) => ({
+                        ...prev,
+                        environmentNotes: `Requesting full dataset & PDF for: ${wpTitle}`
+                      }));
+                      setPilotSubmitted(false);
+                      setDemoModalOpen(true);
+                    }}
+                    className="px-4 py-2 rounded-lg bg-cyan-400 text-slate-950 font-bold text-xs font-mono cursor-pointer"
+                  >
+                    Request Full CAD & Benchmark PDF
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* --- MODAL 3: HIGH-RES FIELD OPTICS LIGHTBOX --- */}
+          {lightboxPhoto && (
+            <div
+              onClick={() => setLightboxPhoto(null)}
+              className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-xl"
+            >
+              <div
+                onClick={(e) => e.stopPropagation()}
+                className="relative w-full max-w-4xl rounded-3xl bg-[#0B0F17] border border-slate-700 overflow-hidden shadow-2xl"
+              >
+                <div className="relative h-96 sm:h-[460px] w-full bg-slate-950">
+                  <img
+                    src={lightboxPhoto.image}
+                    alt={lightboxPhoto.title}
+                    onError={(e) => handleImageError(e, lightboxPhoto.title)}
+                    className="w-full h-full object-cover object-center"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-[#0B0F17] via-transparent to-slate-950/50" />
+                  <button
+                    onClick={() => setLightboxPhoto(null)}
+                    className="absolute top-4 right-4 p-2.5 rounded-full bg-slate-950/80 text-slate-300 hover:text-white border border-slate-700 cursor-pointer"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                  <div className="absolute top-4 left-4 px-3 py-1 rounded bg-slate-950/85 border border-slate-800 text-xs font-mono text-cyan-400">
+                    {lightboxPhoto.camera}
+                  </div>
+                </div>
+                <div className="p-6 sm:p-8 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div>
+                    <div className="text-xs font-mono text-amber-400 uppercase">{lightboxPhoto.location}</div>
+                    <h3 className="text-2xl font-bold text-white mt-1 font-display">{lightboxPhoto.title}</h3>
+                    <div className="text-xs font-mono text-emerald-400 mt-2">{lightboxPhoto.telemetry}</div>
+                  </div>
+                  <button
+                    onClick={() => {
+                      const title = lightboxPhoto.title;
+                      setLightboxPhoto(null);
+                      setPilotForm((prev) => ({
+                        ...prev,
+                        environmentNotes: `Inquiry regarding deployment cell: ${title}`
+                      }));
+                      setPilotSubmitted(false);
+                      setDemoModalOpen(true);
+                    }}
+                    className="px-5 py-3 rounded-xl bg-cyan-400 hover:bg-cyan-300 text-slate-950 font-bold text-xs font-mono uppercase cursor-pointer shrink-0"
+                  >
+                    Request Cell CAD & Specs
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>
